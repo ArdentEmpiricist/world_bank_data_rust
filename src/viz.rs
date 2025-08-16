@@ -58,6 +58,26 @@ fn map_locale(tag: &str) -> (&'static Locale, char) {
     }
 }
 
+// Microsoft Office (2013+) chart series palette.
+// Order: Blue, Orange, Gray, Gold, Light Blue, Green, Dark Blue, Dark Orange, Dark Gray, Brownish Gold.
+const OFFICE10: [RGBColor; 10] = [
+    RGBColor(68, 114, 196),  // blue      (#4472C4)
+    RGBColor(237, 125, 49),  // orange    (#ED7D31)
+    RGBColor(165, 165, 165), // gray      (#A5A5A5)
+    RGBColor(255, 192, 0),   // gold      (#FFC000)
+    RGBColor(91, 155, 213),  // light blue(#5B9BD5)
+    RGBColor(112, 173, 71),  // green     (#70AD47)
+    RGBColor(38, 68, 120),   // dark blue (#264478)
+    RGBColor(158, 72, 14),   // dark org. (#9E480E)
+    RGBColor(99, 99, 99),    // dark gray (#636363)
+    RGBColor(153, 115, 0),   // brownish  (#997300)
+];
+
+#[inline]
+fn office_color(idx: usize) -> RGBAColor {
+    OFFICE10[idx % OFFICE10.len()].to_rgba()
+}
+
 /// Convenience: plot with default locale (`"en"`) and default legend (`Right`).
 pub fn plot_lines<P: AsRef<Path>>(
     points: &[DataPoint],
@@ -407,7 +427,8 @@ where
     let inside_mode = matches!(legend, LegendMode::Inside);
 
     for (idx, ((country_iso3, indicator_id), series)) in groups.iter().enumerate() {
-        let color = Palette99::pick(idx).to_rgba();
+        //let color = Palette99::pick(idx).to_rgba();
+        let color = office_color(idx);
         let style = ShapeStyle {
             color: color.clone(),
             filled: false,
