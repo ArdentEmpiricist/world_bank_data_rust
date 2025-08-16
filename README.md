@@ -96,3 +96,22 @@ We force single-threaded execution only for the optional online test to avoid ra
 ## License
 
 Dual-licensed under either **MIT** or **Apache-2.0**.
+
+### Legend placement
+
+Use `--legend` to control where the legend is rendered:
+
+- `inside` – overlay inside the plotting area (may overlap data)
+- `right`  – dedicated right-side panel (no overlap) **default**
+- `top`    – dedicated top band (no overlap)
+
+```bash
+# Non-overlapping legend on the right (default)
+world_bank_data_rust get -c DEU,USA -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --legend right
+
+# Inside legend (overlay)
+world_bank_data_rust get -c DEU,USA -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --legend inside
+
+# Non-overlapping legend on top
+world_bank_data_rust get -c DEU,USA -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --legend top
+```

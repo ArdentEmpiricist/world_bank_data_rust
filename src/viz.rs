@@ -1,9 +1,18 @@
 use crate::models::DataPoint;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use num_format::{Locale, ToFormattedString};
 use plotters::coord::Shift;
 use plotters::prelude::*;
+use plotters::style::FontStyle;
 use std::path::Path;
+
+/// Legend placement options.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LegendMode {
+    Inside,
+    Right,
+    Top,
+}
 
 /// Map a user-provided locale tag to a num-format Locale and decimal separator.
 /// Supported tags (case-insensitive): "en", "us", "en_US", "de", "de_DE", "german", "fr", "es", "it", "pt", "nl"
@@ -19,14 +28,14 @@ fn map_locale(tag: &str) -> (&'static Locale, char) {
     }
 }
 
-/// Generate a simple multi-series line chart from observations (default locale = "en").
+/// Generate a simple multi-series line chart from observations (default locale = "en", legend = Right).
 pub fn plot_lines<P: AsRef<Path>>(
     points: &[DataPoint],
     out_path: P,
     width: u32,
     height: u32,
 ) -> Result<()> {
-    plot_lines_locale(points, out_path, width, height, "en")
+    plot_lines_locale_with_legend(points, out_path, width, height, "en", LegendMode::Right)
 }
 
 /// Same as `plot_lines` but with a locale tag for label formatting (e.g., "en" or "de").
@@ -36,6 +45,25 @@ pub fn plot_lines_locale<P: AsRef<Path>>(
     width: u32,
     height: u32,
     locale_tag: &str,
+) -> Result<()> {
+    plot_lines_locale_with_legend(
+        points,
+        out_path,
+        width,
+        height,
+        locale_tag,
+        LegendMode::Right,
+    )
+}
+
+/// Fully configurable plotting: choose locale and legend placement.
+pub fn plot_lines_locale_with_legend<P: AsRef<Path>>(
+    points: &[DataPoint],
+    out_path: P,
+    width: u32,
+    height: u32,
+    locale_tag: &str,
+    legend: LegendMode,
 ) -> Result<()> {
     if points.is_empty() {
         return Err(anyhow!("no data to plot"));
@@ -78,19 +106,60 @@ pub fn plot_lines_locale<P: AsRef<Path>>(
     if out_path.extension().and_then(|s| s.to_str()) == Some("svg") {
         let root = SVGBackend::new(path_string.as_str(), (width, height)).into_drawing_area();
         draw_chart(
-            root, points, min_year, max_year, min_val, max_val, num_locale,
+            root, points, min_year, max_year, min_val, max_val, num_locale, legend,
         )?;
     } else {
         let root = BitMapBackend::new(path_string.as_str(), (width, height)).into_drawing_area();
         draw_chart(
-            root, points, min_year, max_year, min_val, max_val, num_locale,
+            root, points, min_year, max_year, min_val, max_val, num_locale, legend,
         )?;
     }
 
     Ok(())
 }
 
-/// Helper that draws to any Plotters backend.
+// --- helper to draw a separate legend panel ---
+fn draw_legend_panel<DB: DrawingBackend>(
+    legend_area: &DrawingArea<DB, Shift>,
+    items: &[(String, RGBAColor)],
+    title: &str,
+) -> anyhow::Result<()> {
+    legend_area
+        .fill(&WHITE)
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    // Draw the title of the legend
+    let title_font = ("sans-serif", 16).into_font().style(FontStyle::Bold);
+    legend_area
+        .draw(&Text::new(title, (8, 20), title_font))
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    // Draw the legend items
+    let (_, h) = legend_area.dim_in_pixel();
+    let mut y = 44i32;
+    let step = 22i32;
+
+    // Iterate over items and draw each swatch + label
+    for (label, color) in items.iter() {
+        if y as u32 + 8 >= h {
+            break;
+        }
+        let swatch = PathElement::new(vec![(8, y), (32, y)], color.clone());
+        legend_area
+            .draw(&swatch)
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        // Draw the label next to the swatch
+        legend_area
+            .draw(&Text::new(label.as_str(), (38, y + 4), ("sans-serif", 14)))
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+        y += step;
+    }
+
+    Ok(())
+}
+
+/// Draw chart with chosen legend placement.
 fn draw_chart<DB>(
     root: DrawingArea<DB, Shift>,
     points: &[DataPoint],
@@ -99,28 +168,49 @@ fn draw_chart<DB>(
     min_val: f64,
     max_val: f64,
     num_locale: &Locale,
-) -> Result<()>
+    legend: LegendMode,
+) -> anyhow::Result<()>
 where
     DB: DrawingBackend,
 {
-    root.fill(&WHITE).map_err(|e| anyhow!("{:?}", e))?;
+    // Decide layout based on legend mode
+    let (plot_area, legend_area_opt): (DrawingArea<DB, Shift>, Option<DrawingArea<DB, Shift>>) =
+        match legend {
+            LegendMode::Right => {
+                let (plot, legend) = root.split_horizontally((85).percent_width());
+                (plot, Some(legend))
+            }
+            LegendMode::Top => {
+                let (legend, plot) = root.split_vertically(64); // ~64 px for legend row
+                (plot, Some(legend))
+            }
+            LegendMode::Inside => (root, None),
+        };
 
-    let mut chart = ChartBuilder::on(&root)
+    plot_area
+        .fill(&WHITE)
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    if let Some(ref legend_area) = legend_area_opt {
+        legend_area
+            .fill(&WHITE)
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    }
+
+    // Build chart on the plotting area
+    let mut chart = ChartBuilder::on(&plot_area)
         .margin(20)
         .caption("World Bank Indicator(s)", ("sans-serif", 24))
         .set_label_area_size(LabelAreaPosition::Left, 80)
         .set_label_area_size(LabelAreaPosition::Bottom, 44)
         .build_cartesian_2d(min_year..max_year, min_val..max_val)
-        .map_err(|e| anyhow!("{:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    // Axis label formatters: Y uses locale thousands separators; integers only
     let y_label_fmt = |v: &f64| {
         let n = (*v).round() as i64;
         n.to_formatted_string(num_locale)
     };
     let x_label_fmt = |y: &i32| y.to_string();
 
-    // Limit label counts to avoid overlap
     let x_label_count = ((max_year - min_year + 1) as usize).min(12);
     let y_label_count = 10usize;
 
@@ -135,7 +225,7 @@ where
         .label_style(("sans-serif", 14))
         .axis_desc_style(("sans-serif", 16))
         .draw()
-        .map_err(|e| anyhow!("{:?}", e))?;
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     use std::collections::BTreeMap;
     let mut groups: BTreeMap<(String, String), Vec<(i32, f64)>> = BTreeMap::new();
@@ -153,35 +243,64 @@ where
         series.sort_by_key(|(y, _)| *y);
     }
 
-    // Distinct color per series, thicker strokes
-    for (idx, ((country, indicator), series)) in groups.iter().enumerate() {
-        // Base palette color -> RGBA (so we can reuse it in style & legend)
-        let color = Palette99::pick(idx).to_rgba();
+    let mut legend_items: Vec<(String, RGBAColor)> = Vec::new();
+    let inside_mode = matches!(legend, LegendMode::Inside);
 
-        // Use the same color for the line stroke
+    for (idx, ((country, indicator), series)) in groups.iter().enumerate() {
+        let color = Palette99::pick(idx).to_rgba();
         let style = ShapeStyle {
             color: color.clone(),
             filled: false,
             stroke_width: 2,
         };
 
-        chart
+        let mut elem = chart
             .draw_series(LineSeries::new(series.clone(), style))
-            .map_err(|e| anyhow!("{:?}", e))?
-            .label(format!("{} • {}", country, indicator))
-            // Move the color into the closure; clone for each legend glyph draw
-            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 24, y)], color.clone()));
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+        if inside_mode {
+            // Register legend entries for the built-in (inside) legend overlay
+            elem = elem
+                .label(format!("{} • {}", country, indicator))
+                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 24, y)], color.clone()));
+        } else {
+            // External legend: collect items
+            legend_items.push((format!("{} • {}", country, indicator), color.clone()));
+        }
     }
 
-    chart
-        .configure_series_labels()
-        .border_style(&BLACK)
-        .position(SeriesLabelPosition::UpperLeft)
-        .background_style(&WHITE.mix(0.85))
-        .label_font(("sans-serif", 14))
-        .draw()
-        .map_err(|e| anyhow!("{:?}", e))?;
+    if inside_mode {
+        chart
+            .configure_series_labels()
+            .border_style(&BLACK)
+            .position(SeriesLabelPosition::UpperLeft)
+            .background_style(&WHITE.mix(0.85))
+            .label_font(("sans-serif", 14))
+            .draw()
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    } else if let Some(ref legend_area) = legend_area_opt {
+        // Render external legend: in the right panel or top band
+        let title = match legend {
+            LegendMode::Right => "Legend",
+            LegendMode::Top => "Legend",
+            LegendMode::Inside => unreachable!(),
+        };
+        let area_ref = if matches!(legend, LegendMode::Top) {
+            // When legend is on top, we created (legend, plot); we need the legend area as-is.
+            &legend_area
+        } else {
+            &legend_area
+        };
+        draw_legend_panel(area_ref, &legend_items, title)?;
+    }
 
-    root.present().map_err(|e| anyhow!("{:?}", e))?;
+    plot_area
+        .present()
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    if let Some(legend_area) = legend_area_opt {
+        legend_area
+            .present()
+            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    }
     Ok(())
 }

@@ -1,10 +1,10 @@
 [package]
 name = "world_bank_data_rust"
 version = "0.1.1"
-edition = "2021"
+edition = "2024"
 description = "A Rust library + CLI to fetch, store, visualize, and summarize World Bank indicator data."
 license = "MIT OR Apache-2.0"
-repository = "https://example.com/world_bank_data_rust"
+repository = "https://crates.io/world_bank_data_rust"
 readme = "README.md"
 categories = ["science", "visualization", "data-format"]
 keywords = ["worldbank", "data", "cli", "visualization"]
@@ -18,7 +18,7 @@ name = "world_bank_data_rust"
 path = "src/bin/world_bank_data_rust.rs"
 
 [features]
-# Enable this to run tests that hit the live World Bank API.
+# Enable this to run tests that hit the live World Bank API. Use: cargo test --features online
 online = []
 
 [dependencies]
