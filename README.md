@@ -23,15 +23,16 @@ world_bank_data_rust get \
   --date 2010:2020 \
   --out pop.csv --format csv \
   --plot pop.svg \
-  --stats
+  --stats \
+  --locale de   # or en, fr, es, it, ...
 ```
 
 This will:
 
 1. Fetch population (SP.POP.TOTL) for Germany and the US from 2010–2020 (via the World Bank V2 API).
 2. Save a tidy CSV (`indicator_id, country_iso3, year, value, ...`).
-3. Render a multi-series line chart to `pop.svg`.
-4. Print grouped statistics (min/max/mean/median) to the terminal.
+3. Render a multi-series line chart to `pop.svg` (axis labels formatted using the chosen locale).
+4. Print grouped statistics (min/max/mean/median) to the terminal using the chosen locale.
 
 ## Data model
 
@@ -59,24 +60,16 @@ The CLI and library normalize API responses into **tidy rows**:
   - Multiple `country` and `indicator` codes are separated by `;`  
   - For **multiple indicators**, the API requires a `source={id}` (e.g., `2` for WDI).
 
-## Library usage
+## Locale option
 
-```rust
-use world_bank_data_rust::{Client, DateSpec};
+Use `--locale` to control number formatting in chart labels and printed stats.
 
-# fn main() -> anyhow::Result<()> {
-let client = Client::default();
-let rows = client.fetch(
-    &["DEU".into(), "USA".into()],
-    &["SP.POP.TOTL".into()],
-    Some(DateSpec::Range{ start: 2015, end: 2020 }),
-    None,
-)?;
-world_bank_data_rust::storage::save_csv(&rows, "out.csv")?;
-world_bank_data_rust::viz::plot_lines(&rows, "out.svg", 1000, 600)?;
-let summary = world_bank_data_rust::stats::grouped_summary(&rows);
-println!("{:#?}", summary);
-# Ok(()) }
+```bash
+# US formatting
+world_bank_data_rust get -c DEU -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --stats --locale en
+
+# German formatting
+world_bank_data_rust get -c DEU -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --stats --locale de
 ```
 
 ## Testing

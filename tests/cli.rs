@@ -17,7 +17,7 @@ fn fetch_online_population() {
     let mut cmd = Command::cargo_bin("world_bank_data_rust").unwrap();
     cmd.args([
         "get", "--countries", "DEU", "--indicators", "SP.POP.TOTL",
-        "--date", "2019:2020", "--stats"
+        "--date", "2019:2020", "--stats", "--locale", "de"
     ]);
     cmd.assert().success();
 }

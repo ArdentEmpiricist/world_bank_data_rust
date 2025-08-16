@@ -21,7 +21,7 @@
 //!     None,
 //! )?;
 //! world_bank_data_rust::storage::save_csv(&data, "pop_2010_2020.csv")?;
-//! world_bank_data_rust::viz::plot_lines(&data, "pop.svg", 1000, 600)?;
+//! world_bank_data_rust::viz::plot_lines_locale(&data, "pop.svg", 1000, 600, "en")?;
 //! let stats = world_bank_data_rust::stats::grouped_summary(&data);
 //! println!("{:#?}", stats);
 //! # Ok::<(), anyhow::Error>(())

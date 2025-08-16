@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use num_format::{Locale, ToFormattedString};
 use std::path::PathBuf;
-use world_bank_data_rust::{Client, DateSpec};
 use world_bank_data_rust::{stats, storage, viz};
+use world_bank_data_rust::{Client, DateSpec};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -59,21 +60,13 @@ struct GetArgs {
     /// Print grouped statistics to stdout.
     #[arg(long, default_value_t = false)]
     stats: bool,
-}
-
-fn fmt_opt(v: Option<f64>) -> String {
-    match v {
-        Some(x) if x.is_finite() => {
-            // Format up to 4 decimals, then trim trailing zeros and trailing dot.
-            let s = format!("{:.4}", x);
-            s.trim_end_matches('0').trim_end_matches('.').to_string()
-        }
-        _ => "NA".to_string(),
-    }
+    /// Locale for number formatting in chart labels & stats (e.g., en, de, fr). Default: en
+    #[arg(long, default_value = "en")]
+    locale: String,
 }
 
 fn parse_list(s: &str) -> Vec<String> {
-    s.split([',', ';'])
+    s.split(|c| c == ',' || c == ';')
         .map(|x| x.trim().to_string())
         .filter(|x| !x.is_empty())
         .collect()
@@ -86,6 +79,55 @@ fn parse_date(s: &str) -> Option<DateSpec> {
         Some(DateSpec::Range { start, end })
     } else {
         s.parse::<i32>().ok().map(DateSpec::Year)
+    }
+}
+
+fn map_locale(tag: &str) -> (&'static Locale, char) {
+    match tag.to_lowercase().as_str() {
+        "de" | "de_de" | "german" => (&Locale::de, ','),
+        "fr" | "fr_fr" => (&Locale::fr, ','),
+        "es" | "es_es" => (&Locale::es, ','),
+        "it" | "it_it" => (&Locale::it, ','),
+        "pt" | "pt_pt" | "pt_br" => (&Locale::pt, ','),
+        "nl" | "nl_nl" => (&Locale::nl, ','),
+        _ => (&Locale::en, '.'),
+    }
+}
+
+fn fmt_float_with_locale(x: f64, loc: &Locale, dec_sep: char) -> String {
+    // Format with up to 4 decimals, then add grouping to integer part and locale decimal separator
+    let mut s = format!("{:.4}", x);
+    if s.contains('.') {
+        while s.ends_with('0') {
+            s.pop();
+        }
+        if s.ends_with('.') {
+            s.pop();
+        }
+    }
+    if let Some((intp, fracp)) = s.split_once('.') {
+        let sign = if intp.starts_with('-') { "-" } else { "" };
+        let digits = intp.trim_start_matches('-');
+        let int_num: i64 = digits.parse().unwrap_or(0);
+        let grouped = int_num.to_formatted_string(loc);
+        if fracp.is_empty() {
+            format!("{}{}", sign, grouped)
+        } else {
+            format!("{}{}{}{}", sign, grouped, dec_sep, fracp)
+        }
+    } else {
+        let sign = if s.starts_with('-') { "-" } else { "" };
+        let digits = s.trim_start_matches('-');
+        let int_num: i64 = digits.parse().unwrap_or(0);
+        let grouped = int_num.to_formatted_string(loc);
+        format!("{}{}", sign, grouped)
+    }
+}
+
+fn fmt_opt_locale(v: Option<f64>, loc: &Locale, dec_sep: char) -> String {
+    match v {
+        Some(x) if x.is_finite() => fmt_float_with_locale(x, loc, dec_sep),
+        _ => "NA".to_string(),
     }
 }
 
@@ -127,11 +169,12 @@ fn cmd_get(args: GetArgs) -> Result<()> {
     }
 
     if let Some(plot_path) = args.plot.as_ref() {
-        viz::plot_lines(&points, plot_path, args.width, args.height)?;
+        viz::plot_lines_locale(&points, plot_path, args.width, args.height, &args.locale)?;
         eprintln!("Wrote plot to {}", plot_path.display());
     }
 
     if args.stats {
+        let (loc, dec_sep) = map_locale(&args.locale);
         let summaries = stats::grouped_summary(&points);
         for s in summaries {
             println!(
@@ -140,10 +183,10 @@ fn cmd_get(args: GetArgs) -> Result<()> {
                 s.key.indicator_id,
                 s.count,
                 s.missing,
-                fmt_opt(s.min),
-                fmt_opt(s.max),
-                fmt_opt(s.mean),
-                fmt_opt(s.median)
+                fmt_opt_locale(s.min, loc, dec_sep),
+                fmt_opt_locale(s.max, loc, dec_sep),
+                fmt_opt_locale(s.mean, loc, dec_sep),
+                fmt_opt_locale(s.median, loc, dec_sep),
             );
         }
     }

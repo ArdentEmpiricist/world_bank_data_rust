@@ -98,7 +98,7 @@ pub struct Entry {
 pub struct DataPoint {
     pub indicator_id: String,
     pub indicator_name: String,
-    pub country_id: String, // typically ISO2
+    pub country_id: String,   // typically ISO2
     pub country_name: String,
     pub country_iso3: String,
     pub year: i32,

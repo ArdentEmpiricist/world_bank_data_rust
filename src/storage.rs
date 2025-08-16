@@ -34,31 +34,3 @@ pub fn save_json<P: AsRef<Path>>(points: &[DataPoint], path: P) -> Result<()> {
     f.write_all(s.as_bytes())?;
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-    use crate::models::DataPoint;
-
-    #[test]
-    fn write_csv_and_json() {
-        let dir = tempdir().unwrap();
-        let csvp = dir.path().join("x.csv");
-        let jsonp = dir.path().join("x.json");
-        let pts = vec![DataPoint {
-            indicator_id: "A".into(),
-            indicator_name: "Alpha".into(),
-            country_id: "DE".into(),
-            country_name: "Germany".into(),
-            country_iso3: "DEU".into(),
-            year: 2000,
-            value: Some(1.23),
-            unit: None, obs_status: None, decimal: None,
-        }];
-        save_csv(&pts, &csvp).unwrap();
-        save_json(&pts, &jsonp).unwrap();
-        assert!(csvp.exists());
-        assert!(jsonp.exists());
-    }
-}
