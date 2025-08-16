@@ -4,6 +4,7 @@ use num_format::{Locale, ToFormattedString};
 use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters::style::FontStyle;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 /// Legend placement options.
@@ -198,10 +199,11 @@ where
 
     // Build chart on the plotting area
     let mut chart = ChartBuilder::on(&plot_area)
-        .margin(20)
+        .margin(16)
         .caption("World Bank Indicator(s)", ("sans-serif", 24))
-        .set_label_area_size(LabelAreaPosition::Left, 80)
-        .set_label_area_size(LabelAreaPosition::Bottom, 44)
+        // Make room so the vertical y-axis title "Value" never overlaps tick labels
+        .set_label_area_size(LabelAreaPosition::Left, 100)
+        .set_label_area_size(LabelAreaPosition::Bottom, 56)
         .build_cartesian_2d(min_year..max_year, min_val..max_val)
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
@@ -222,10 +224,22 @@ where
         .y_labels(y_label_count)
         .x_label_formatter(&x_label_fmt)
         .y_label_formatter(&y_label_fmt)
-        .label_style(("sans-serif", 14))
+        .label_style(("sans-serif", 12)) // was 14
         .axis_desc_style(("sans-serif", 16))
         .draw()
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    // Map IDs to human-readable names from the API
+    let mut indicator_name_by_id: HashMap<String, String> = HashMap::new();
+    let mut country_name_by_iso3: HashMap<String, String> = HashMap::new();
+    for p in points {
+        indicator_name_by_id
+            .entry(p.indicator_id.clone())
+            .or_insert_with(|| p.indicator_name.clone());
+        country_name_by_iso3
+            .entry(p.country_iso3.clone())
+            .or_insert_with(|| p.country_name.clone());
+    }
 
     use std::collections::BTreeMap;
     let mut groups: BTreeMap<(String, String), Vec<(i32, f64)>> = BTreeMap::new();
@@ -246,7 +260,7 @@ where
     let mut legend_items: Vec<(String, RGBAColor)> = Vec::new();
     let inside_mode = matches!(legend, LegendMode::Inside);
 
-    for (idx, ((country, indicator), series)) in groups.iter().enumerate() {
+    for (idx, ((country_iso3, indicator_id), series)) in groups.iter().enumerate() {
         let color = Palette99::pick(idx).to_rgba();
         let style = ShapeStyle {
             color: color.clone(),
@@ -254,18 +268,30 @@ where
             stroke_width: 2,
         };
 
+        // Resolve full display names
+        let country_label = country_name_by_iso3
+            .get(country_iso3)
+            .cloned()
+            .unwrap_or_else(|| country_iso3.clone());
+        let indicator_label = indicator_name_by_id
+            .get(indicator_id)
+            .cloned()
+            .unwrap_or_else(|| indicator_id.clone());
+        let legend_label = format!("{} \u{2014} {}", country_label, indicator_label); // em-dash looks tidy
+
         let mut elem = chart
             .draw_series(LineSeries::new(series.clone(), style))
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
         if inside_mode {
-            // Register legend entries for the built-in (inside) legend overlay
-            elem = elem
-                .label(format!("{} • {}", country, indicator))
-                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 24, y)], color.clone()));
+            // Keep the overlay legend variant consistent with the external one
+            let legend_color = color.clone();
+            elem = elem.label(legend_label.clone()).legend(move |(x, y)| {
+                PathElement::new(vec![(x, y), (x + 24, y)], legend_color.clone())
+            });
         } else {
-            // External legend: collect items
-            legend_items.push((format!("{} • {}", country, indicator), color.clone()));
+            // External legend panel
+            legend_items.push((legend_label, color.clone()));
         }
     }
 
