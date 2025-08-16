@@ -36,6 +36,17 @@ enum LegendPos {
     Bottom,
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+enum PlotKindArg {
+    Line,
+    Scatter,
+    LinePoints,
+    Area,
+    StackedArea,
+    GroupedBar,
+    Loess,
+}
+
 #[derive(Args, Debug)]
 struct GetArgs {
     /// Country/region codes separated by comma or semicolon (e.g., DEU,USA or EUU)
@@ -74,10 +85,16 @@ struct GetArgs {
     /// Locale for number formatting in chart labels & stats (e.g., en, de, fr). Default: en
     #[arg(long, default_value = "en")]
     locale: String,
-    /// Legend placement: inside (overlays in plot), right (separate panel), or top (separate band).
+    /// Legend placement: inside (overlay), right (panel), top (band), or bottom (band).
     /// Default: right
     #[arg(long, value_enum, default_value = "right")]
     legend: LegendPos,
+    /// Chart type: line, scatter, line-points, or area (default: line)
+    #[arg(long = "plot-kind", value_enum, default_value = "line")]
+    plot_kind: PlotKindArg,
+    /// LOESS span in (0,1]; fraction of neighbors used (only for --plot-kind loess)
+    #[arg(long = "loess-span", default_value_t = 0.3, value_parser = parse_loess_span)]
+    loess_span: f64,
 }
 
 fn parse_list(s: &str) -> Vec<String> {
@@ -190,7 +207,16 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             LegendPos::Bottom => viz::LegendMode::Bottom,
         };
         let title = args.title.as_deref().unwrap_or("World Bank Indicator(s)");
-        viz::plot_lines_locale_with_legend_title(
+        let plot_kind = match args.plot_kind {
+            PlotKindArg::Line => viz::PlotKind::Line,
+            PlotKindArg::Scatter => viz::PlotKind::Scatter,
+            PlotKindArg::LinePoints => viz::PlotKind::LinePoints,
+            PlotKindArg::Area => viz::PlotKind::Area,
+            PlotKindArg::StackedArea => viz::PlotKind::StackedArea,
+            PlotKindArg::GroupedBar => viz::PlotKind::GroupedBar,
+            PlotKindArg::Loess => viz::PlotKind::Loess,
+        };
+        viz::plot_chart(
             &points,
             plot_path,
             args.width,
@@ -198,6 +224,8 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             &args.locale,
             legend_mode,
             title,
+            plot_kind,
+            args.loess_span,
         )?;
         eprintln!("Wrote plot to {}", plot_path.display());
     }
@@ -221,4 +249,16 @@ fn cmd_get(args: GetArgs) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Validate `--loess-span` ∈ (0, 1].
+fn parse_loess_span(s: &str) -> Result<f64, String> {
+    let x: f64 = s
+        .parse()
+        .map_err(|_| "invalid float for --loess-span".to_string())?;
+    if x <= 0.0 || x > 1.0 {
+        Err("loess span must be in (0, 1]".into())
+    } else {
+        Ok(x)
+    }
 }

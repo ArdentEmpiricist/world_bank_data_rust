@@ -1,18 +1,19 @@
+
 # world_bank_data_rust 🦀📊
 
-A Rust library + CLI to fetch, store, visualize, and summarize [World Bank](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589-developer-information) indicator data.
+A Rust **library + CLI** to fetch, store, visualize, and summarize [World Bank](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589-developer-information) indicator data.
 
-- **Library**: typed API client, tidy data model, simple stats and plotting
-- **CLI**: one-liner to fetch → save/plot → print summaries
+- **Library**: typed API client, tidy data model, summary stats, flexible plotting
+- **CLI**: one-liners to fetch → save/plot → print summaries
 
 ## Install
 
 ```bash
-# From source
-git clone https://example.com/world_bank_data_rust
-cd world_bank_data_rust
+# From source (inside the project folder)
 cargo install --path .
 ```
+
+---
 
 ## Quickstart
 
@@ -24,94 +25,240 @@ world_bank_data_rust get \
   --out pop.csv --format csv \
   --plot pop.svg \
   --stats \
-  --locale de   # or en, fr, es, it, ...
+  --locale de
 ```
 
-This will:
+- Saves tidy CSV to `pop.csv`
+- Creates a chart at `pop.svg`
+- Prints grouped stats to stdout with **German** number formatting
 
-1. Fetch population (SP.POP.TOTL) for Germany and the US from 2010–2020 (via the World Bank V2 API).
-2. Save a tidy CSV (`indicator_id, country_iso3, year, value, ...`).
-3. Render a multi-series line chart to `pop.svg` (axis labels formatted using the chosen locale).
-4. Print grouped statistics (min/max/mean/median) to the terminal using the chosen locale.
+---
 
-## Data model
+## Full CLI Reference
 
-The CLI and library normalize API responses into **tidy rows**:
+### Command
 
-| field            | description                                      |
-|------------------|--------------------------------------------------|
-| indicator_id     | Indicator code (e.g., `SP.POP.TOTL`)             |
-| indicator_name   | Human-readable indicator name                    |
-| country_id       | Country/region id (often ISO2)                   |
-| country_name     | Human-readable country/region name               |
-| country_iso3     | ISO3 alpha-3 code                                |
-| year             | Year as integer                                  |
-| value            | Numeric observation (nullable)                   |
-| unit             | Optional unit string                             |
-| obs_status       | Optional observation status                      |
-| decimal          | Decimal places                                   |
+```
+world_bank_data_rust get [OPTIONS]
+```
 
-## API coverage
+### Required
 
-- Endpoint: `GET https://api.worldbank.org/v2/country/{codes}/indicator/{codes}`  
-  - Response shape: JSON array `[Meta, [Entry, ...]]`  
-  - Pagination fields in `Meta`: `page`, `pages`, `per_page`, `total`  
-  - Parameters used: `format=json`, `date=YYYY` or `YYYY:YYYY`, `per_page=1000`, `page=N`  
-  - Multiple `country` and `indicator` codes are separated by `;`  
-  - For **multiple indicators**, the API requires a `source={id}` (e.g., `2` for WDI).
+| Flag | Type | Description |
+|---|---|---|
+| `-c, --countries` | string | Comma/semicolon-separated country/region codes. Examples: `DEU,USA`, `EUU`. |
+| `-i, --indicators` | string | Comma/semicolon-separated indicator codes. Example: `SP.POP.TOTL`. |
 
-## Locale option
+### Optional
 
-Use `--locale` to control number formatting in chart labels and printed stats.
+| Flag | Type | Default | Description |
+|---|---|---:|---|
+| `-d, --date` | `YYYY` or `YYYY:YYYY` | — | Single year or inclusive range. Example: `2010:2020`. |
+| `--source` | integer | — | Indicator source id (e.g., `2` for WDI). Required by API **when querying multiple indicators**. |
+| `--out` | path | — | Save results to file. Use with `--format` or let extension infer format. |
+| `--format` | enum `csv,json` | — | Output format for `--out`. |
+| `--plot` | path | — | Create a chart at the given path (`.svg` or `.png`). |
+| `--width` | integer | `1000` | Chart width (pixels). |
+| `--height` | integer | `600` | Chart height (pixels). |
+| `--title` | string | `"World Bank Indicator(s)"` | Chart title. |
+| `--stats` | flag | `false` | Print grouped summary stats to stdout. |
+| `--locale` | string | `"en"` | Number formatting for chart labels & stats. Supports `en,de,fr,es,it,pt,nl,…`. |
+| `--legend` | enum `inside,right,top,bottom` | `right` | Where the legend is rendered. `inside` overlays the plot; others avoid overlap. |
+| `--plot-kind` | enum `line,scatter,line-points,area,stacked-area,grouped-bar,loess` | `line` | Chart type (see examples below). |
+| `--loess-span` | float in `(0,1]` | `0.3` | Smoothing span for `--plot-kind loess`. Ignored for other kinds. |
+
+### Notes
+
+- `--plot` supports **SVG** and **PNG** based on the file extension.
+- For **multiple indicators** in a single request, the World Bank API requires a `--source` id (commonly `2` for WDI).
+- Legends: `right`/`top`/`bottom` render outside the plot to avoid overlap; long labels wrap/truncate as needed; markers are centered with text.
+- Colors follow the **Microsoft Office palette** (Blue, Orange, Gray, Gold, Light Blue, Green, …).
+
+---
+
+## Examples
+
+### 1) Fetch & Save
+
+**CSV**
 
 ```bash
-# US formatting
-world_bank_data_rust get -c DEU -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --stats --locale en
-
-# German formatting
-world_bank_data_rust get -c DEU -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --stats --locale de
+world_bank_data_rust get \
+  --countries DEU,USA \
+  --indicators SP.POP.TOTL \
+  --date 2010:2020 \
+  --out pop.csv --format csv
 ```
 
-## Testing
-
-- **Unit tests** cover parsing, stats, storage, and plotting.
-- **CLI smoke tests** validate help and (optionally) live fetches.
-
-To run the online test (hits the live API), opt in:
+**JSON (format via extension)**
 
 ```bash
-cargo test --features online -- --ignored --test-threads=1
+world_bank_data_rust get \
+  --countries DEU \
+  --indicators SP.POP.TOTL \
+  --date 2019 \
+  --out pop.json
 ```
 
-We force single-threaded execution only for the optional online test to avoid rate limiting under CI.
+### 2) Basic Plots
 
-## Notes & Best Practices
+**Line (default)**
 
-- The client uses the **blocking** `reqwest` API to keep the CLI simple.
-- We normalize values into a tidy schema to make downstream analysis easy.
-- Plot rendering supports **SVG** and **PNG** (infer from file extension).
-- For multiple indicators, pass `--source 2` to satisfy the API.
-- Avoid exceedingly large queries; the CLI paginates with `per_page=1000`.
+```bash
+world_bank_data_rust get \
+  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
+  --plot pop.svg --legend right
+```
+
+**Scatter**
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
+  --plot pop_scatter.svg --legend top \
+  --plot-kind scatter
+```
+
+**Line + Points**
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
+  --plot pop_lp.svg --legend bottom \
+  --plot-kind line-points
+```
+
+**Area**
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
+  --plot pop_area.svg --legend right \
+  --plot-kind area
+```
+
+### 3) Advanced Plots
+
+**Stacked Area** (stacks **positive** contributions per year)
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA \
+  -i SP.POP.TOTL \
+  -d 2010:2020 \
+  --plot pop_stacked.svg \
+  --legend bottom \
+  --plot-kind stacked-area
+```
+
+**Grouped Bar** (bars offset within each year)
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA \
+  -i SP.POP.TOTL \
+  -d 2010:2020 \
+  --plot pop_bars.svg \
+  --legend top \
+  --plot-kind grouped-bar
+```
+
+**LOESS Smoothing** (local regression; `span` controls smoothness)
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA \
+  -i SP.POP.TOTL \
+  -d 1960:2020 \
+  --plot pop_loess.svg \
+  --legend right \
+  --plot-kind loess \
+  --loess-span 0.25
+```
+
+### 4) International Formatting & Titles
+
+**German formatting + custom title**
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA \
+  -i SP.POP.TOTL \
+  -d 2010:2020 \
+  --plot pop_de.svg \
+  --legend right \
+  --locale de \
+  --title "Bevölkerung gesamt (2010–2020)"
+```
+
+**PNG output**
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA \
+  -i SP.POP.TOTL \
+  -d 2010:2020 \
+  --plot pop.png \
+  --legend right
+```
+
+### 5) Stats in the Terminal
+
+```bash
+world_bank_data_rust get \
+  -c DEU,USA \
+  -i SP.POP.TOTL \
+  -d 2010:2020 \
+  --stats --locale en
+```
+
+Output looks like:
+
+```
+DEU • SP.POP.TOTL  count=11 missing=0  min=80,274,983 max=83,160,871 mean=81,814,340 median=81,776,930
+USA • SP.POP.TOTL  count=11 missing=0  min=...       max=...       mean=...       median=...
+```
+
+---
+
+## Library Highlights (Rust)
+
+```rust
+use world_bank_data_rust::{Client, DateSpec};
+use world_bank_data_rust::viz::{self, LegendMode, PlotKind};
+
+let client = Client::default();
+let data = client.fetch(
+    &["DEU".into(), "USA".into()],
+    &["SP.POP.TOTL".into()],
+    Some(DateSpec::Range{ start: 2010, end: 2020 }),
+    None,
+)?;
+
+// Save
+world_bank_data_rust::storage::save_csv(&data, "pop.csv")?;
+
+// Plot (scatter, German labels)
+viz::plot_chart(&data, "pop.svg", 1000, 600, "de", LegendMode::Top, "Population (2010–2020)", PlotKind::Scatter, 0.3)?;
+
+// Summaries
+let summaries = world_bank_data_rust::stats::grouped_summary(&data);
+for s in summaries {
+    println!("{:?}", s);
+}
+# Ok::<(), anyhow::Error>(())
+```
+
+---
+
+## Tips & Notes
+
+- **Legends:** Use `--legend top` / `bottom` for long labels (they wrap over multiple rows). `--legend right` truncates long labels to fit the panel.
+- **Inside legend:** `--legend inside` overlays the plot and can overlap lines; keep for quick previews.
+- **Multiple indicators:** Pass `--source 2` (WDI) when using multiple indicator codes; otherwise the API may error.
+- **Colors:** Series colors follow the Microsoft Office palette (Blue, Orange, Gray, Gold, Light Blue, Green, …).
+- **Axes:** Y-axis shows whole numbers with locale-specific thousands separators.
 
 ## License
 
 Dual-licensed under either **MIT** or **Apache-2.0**.
-
-### Legend placement
-
-Use `--legend` to control where the legend is rendered:
-
-- `inside` – overlay inside the plotting area (may overlap data)
-- `right`  – dedicated right-side panel (no overlap) **default**
-- `top`    – dedicated top band (no overlap)
-
-```bash
-# Non-overlapping legend on the right (default)
-world_bank_data_rust get -c DEU,USA -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --legend right
-
-# Inside legend (overlay)
-world_bank_data_rust get -c DEU,USA -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --legend inside
-
-# Non-overlapping legend on top
-world_bank_data_rust get -c DEU,USA -i SP.POP.TOTL -d 2010:2020 --plot pop.svg --legend top
-```

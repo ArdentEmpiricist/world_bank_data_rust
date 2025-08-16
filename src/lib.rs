@@ -7,11 +7,12 @@
 //! - Fetch indicators for one or more countries/regions and years or ranges
 //! - Save as CSV or JSON in a tidy, analysis-friendly schema
 //! - Quick summary statistics (min, max, mean, median)
-//! - Generate SVG/PNG line charts from the data
+//! - Generate SVG/PNG charts: Line, Scatter, Line+Points, Area
 //!
 //! ### Example
 //! ```no_run
 //! use world_bank_data_rust::{Client, DateSpec};
+//! use world_bank_data_rust::viz::{LegendMode, PlotKind};
 //!
 //! let client = Client::default();
 //! let data = client.fetch(
@@ -21,7 +22,7 @@
 //!     None,
 //! )?;
 //! world_bank_data_rust::storage::save_csv(&data, "pop_2010_2020.csv")?;
-//! world_bank_data_rust::viz::plot_lines_locale(&data, "pop.svg", 1000, 600, "en")?;
+//! world_bank_data_rust::viz::plot_chart(&data, "pop.svg", 1000, 600, "en", LegendMode::Right, "World Bank Indicator(s)", PlotKind::LinePoints)?;
 //! let stats = world_bank_data_rust::stats::grouped_summary(&data);
 //! println!("{:#?}", stats);
 //! # Ok::<(), anyhow::Error>(())
