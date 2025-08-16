@@ -1,6 +1,10 @@
 
 # world_bank_data_rust 🦀📊
 
+<p align="center">
+  <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="enc_file Logo" width="200"/>
+</p>
+
 A Rust **library + CLI** to fetch, store, visualize, and summarize [World Bank](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589-developer-information) indicator data.
 
 - **Library**: typed API client, tidy data model, summary stats, flexible plotting
