@@ -1,13 +1,16 @@
-
-use std::path::PathBuf;
-use clap::{Parser, Subcommand, Args, ValueEnum};
-use world_bank_data_rust::{Client, DateSpec};
-use world_bank_data_rust::{storage, stats, viz};
 use anyhow::Result;
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use num_format::{Locale, ToFormattedString};
+use std::path::PathBuf;
+use world_bank_data_rust::{Client, DateSpec};
+use world_bank_data_rust::{stats, storage, viz};
 
 #[derive(Parser, Debug)]
-#[command(name = "world_bank_data_rust", version, about = "Fetch, store, visualize & summarize World Bank indicators")]
+#[command(
+    name = "world_bank_data_rust",
+    version,
+    about = "Fetch, store, visualize & summarize World Bank indicators"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Command,
@@ -20,10 +23,18 @@ enum Command {
 }
 
 #[derive(ValueEnum, Clone, Debug)]
-enum OutFormat { Csv, Json }
+enum OutFormat {
+    Csv,
+    Json,
+}
 
 #[derive(ValueEnum, Clone, Debug)]
-enum LegendPos { Inside, Right, Top }
+enum LegendPos {
+    Inside,
+    Right,
+    Top,
+    Bottom,
+}
 
 #[derive(Args, Debug)]
 struct GetArgs {
@@ -34,7 +45,7 @@ struct GetArgs {
     #[arg(short, long)]
     indicators: String,
     /// Year (YYYY) or range (YYYY:YYYY)
-    #[arg(short='d', long)]
+    #[arg(short = 'd', long)]
     date: Option<String>,
     /// Source id (e.g., 2 for WDI). Required by API when requesting multiple indicators.
     #[arg(long)]
@@ -49,35 +60,38 @@ struct GetArgs {
     #[arg(long)]
     plot: Option<PathBuf>,
     /// Width of the plot (default 1000).
-    #[arg(long, default_value_t=1000)]
+    #[arg(long, default_value_t = 1000)]
     width: u32,
     /// Height of the plot (default 600).
-    #[arg(long, default_value_t=600)]
+    #[arg(long, default_value_t = 600)]
     height: u32,
+    /// Title for the chart (defaults to "World Bank Indicator(s)")
+    #[arg(long)]
+    title: Option<String>,
     /// Print grouped statistics to stdout.
-    #[arg(long, default_value_t=false)]
+    #[arg(long, default_value_t = false)]
     stats: bool,
     /// Locale for number formatting in chart labels & stats (e.g., en, de, fr). Default: en
-    #[arg(long, default_value="en")]
+    #[arg(long, default_value = "en")]
     locale: String,
     /// Legend placement: inside (overlays in plot), right (separate panel), or top (separate band).
     /// Default: right
-    #[arg(long, value_enum, default_value="right")]
+    #[arg(long, value_enum, default_value = "right")]
     legend: LegendPos,
 }
 
 fn parse_list(s: &str) -> Vec<String> {
     s.split(|c| c == ',' || c == ';')
-     .map(|x| x.trim().to_string())
-     .filter(|x| !x.is_empty())
-     .collect()
+        .map(|x| x.trim().to_string())
+        .filter(|x| !x.is_empty())
+        .collect()
 }
 
 fn parse_date(s: &str) -> Option<DateSpec> {
-    if let Some((a,b)) = s.split_once(':') {
+    if let Some((a, b)) = s.split_once(':') {
         let start = a.parse::<i32>().ok()?;
         let end = b.parse::<i32>().ok()?;
-        Some(DateSpec::Range{ start, end })
+        Some(DateSpec::Range { start, end })
     } else {
         s.parse::<i32>().ok().map(DateSpec::Year)
     }
@@ -98,8 +112,12 @@ fn map_locale(tag: &str) -> (&'static Locale, char) {
 fn fmt_float_with_locale(x: f64, loc: &Locale, dec_sep: char) -> String {
     let mut s = format!("{:.4}", x);
     if s.contains('.') {
-        while s.ends_with('0') { s.pop(); }
-        if s.ends_with('.') { s.pop(); }
+        while s.ends_with('0') {
+            s.pop();
+        }
+        if s.ends_with('.') {
+            s.pop();
+        }
     }
     if let Some((intp, fracp)) = s.split_once('.') {
         let sign = if intp.starts_with('-') { "-" } else { "" };
@@ -139,8 +157,12 @@ fn cmd_get(args: GetArgs) -> Result<()> {
     let countries = parse_list(&args.countries);
     let indicators = parse_list(&args.indicators);
     let date = match &args.date {
-        Some(s) => parse_date(s).ok_or_else(|| anyhow::anyhow!("invalid --date, expected YYYY or YYYY:YYYY"))?,
-        None => DateSpec::Range { start: 2000, end: 2020 },
+        Some(s) => parse_date(s)
+            .ok_or_else(|| anyhow::anyhow!("invalid --date, expected YYYY or YYYY:YYYY"))?,
+        None => DateSpec::Range {
+            start: 2000,
+            end: 2020,
+        },
     };
 
     let points = client.fetch(&countries, &indicators, Some(date), args.source)?;
@@ -150,7 +172,8 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             Some(OutFormat::Csv) => "csv",
             Some(OutFormat::Json) => "json",
             None => path.extension().and_then(|e| e.to_str()).unwrap_or("csv"),
-        }.to_ascii_lowercase();
+        }
+        .to_ascii_lowercase();
         match fmt.as_str() {
             "csv" => storage::save_csv(&points, path)?,
             "json" => storage::save_json(&points, path)?,
@@ -162,10 +185,20 @@ fn cmd_get(args: GetArgs) -> Result<()> {
     if let Some(plot_path) = args.plot.as_ref() {
         let legend_mode = match args.legend {
             LegendPos::Inside => viz::LegendMode::Inside,
-            LegendPos::Right  => viz::LegendMode::Right,
-            LegendPos::Top    => viz::LegendMode::Top,
+            LegendPos::Right => viz::LegendMode::Right,
+            LegendPos::Top => viz::LegendMode::Top,
+            LegendPos::Bottom => viz::LegendMode::Bottom,
         };
-        viz::plot_lines_locale_with_legend(&points, plot_path, args.width, args.height, &args.locale, legend_mode)?;
+        let title = args.title.as_deref().unwrap_or("World Bank Indicator(s)");
+        viz::plot_lines_locale_with_legend_title(
+            &points,
+            plot_path,
+            args.width,
+            args.height,
+            &args.locale,
+            legend_mode,
+            title,
+        )?;
         eprintln!("Wrote plot to {}", plot_path.display());
     }
 
