@@ -98,7 +98,7 @@ pub struct Entry {
 pub struct DataPoint {
     pub indicator_id: String,
     pub indicator_name: String,
-    pub country_id: String,   // typically ISO2
+    pub country_id: String, // typically ISO2
     pub country_name: String,
     pub country_iso3: String,
     pub year: i32,
@@ -110,7 +110,7 @@ pub struct DataPoint {
 
 impl From<Entry> for DataPoint {
     fn from(e: Entry) -> Self {
-        let year = e.date.parse::<i32>().unwrap_or_else(|_| 0);
+        let year = e.date.parse::<i32>().unwrap_or(0);
         Self {
             indicator_id: e.indicator.id,
             indicator_name: e.indicator.value,

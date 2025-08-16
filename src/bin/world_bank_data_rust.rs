@@ -98,7 +98,7 @@ struct GetArgs {
 }
 
 fn parse_list(s: &str) -> Vec<String> {
-    s.split(|c| c == ',' || c == ';')
+    s.split([',', ';'])
         .map(|x| x.trim().to_string())
         .filter(|x| !x.is_empty())
         .collect()
