@@ -2,7 +2,38 @@ use crate::models::{DataPoint, GroupKey};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Summary statistics for a group.
+/// Simple grouped summary statistics.
+///
+/// Summary statistics per `(indicator_id, country_iso3)` group.
+#[doc = "- `count`: number of non-missing values"]
+#[doc = "- `missing`: number of missing values"]
+#[doc = "- `min`/`max`: extremes over non-missing"]
+#[doc = "- `mean`: arithmetic mean"]
+#[doc = "- `median`: middle value (average of two middles for even length)"]
+///
+/// Compute grouped statistics by `(indicator_id, country_iso3)`.
+///
+/// - Missing values are **not** included in `count`, but are reflected in `missing`.
+/// - Sorting is stable and based on the tuple key, so results are deterministic.
+///
+/// ### Example
+/// ```
+/// use world_bank_data_rust::models::DataPoint;
+/// use world_bank_data_rust::stats::grouped_summary;
+///
+/// let rows = vec![
+///     DataPoint { indicator_id: "X".into(), indicator_name: "Demo".into(),
+///                 country_id:"DE".into(), country_name:"Germany".into(), country_iso3:"DEU".into(),
+///                 year: 2020, value: Some(1.0), unit: None, obs_status: None, decimal: None },
+///     DataPoint { indicator_id: "X".into(), indicator_name: "Demo".into(),
+///                 country_id:"DE".into(), country_name:"Germany".into(), country_iso3:"DEU".into(),
+///                 year: 2021, value: None, unit: None, obs_status: None, decimal: None },
+/// ];
+/// let s = grouped_summary(&rows);
+/// assert_eq!(s[0].count, 1);
+/// assert_eq!(s[0].missing, 1);
+/// ```
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Summary {
     pub key: GroupKey,
@@ -37,7 +68,9 @@ pub fn grouped_summary(points: &[DataPoint]) -> Vec<Summary> {
         let max = vals.last().cloned();
         let mean = if count > 0 {
             Some(vals.iter().copied().sum::<f64>() / count as f64)
-        } else { None };
+        } else {
+            None
+        };
         let median = if count == 0 {
             None
         } else if count % 2 == 1 {
@@ -46,7 +79,15 @@ pub fn grouped_summary(points: &[DataPoint]) -> Vec<Summary> {
             Some((vals[count / 2 - 1] + vals[count / 2]) / 2.0)
         };
         let miss = missing.get(&key).cloned().unwrap_or(0);
-        out.push(Summary { key, count, missing: miss, min, max, mean, median });
+        out.push(Summary {
+            key,
+            count,
+            missing: miss,
+            min,
+            max,
+            mean,
+            median,
+        });
     }
     out
 }

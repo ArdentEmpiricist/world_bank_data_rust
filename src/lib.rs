@@ -1,19 +1,25 @@
-//! world_bank_data_rust
+//! # world_bank_data_rust
 //!
-//! A lightweight Rust library for retrieving, storing, visualizing, and analyzing
-//! World Bank indicator data. Pairs with the `world_bank_data_rust` CLI.
+//! A lightweight **Rust library + CLI** to fetch, store, visualize, and summarize
+//! [World Bank Indicators API](https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation)
+//! data.
 //!
-//! ### Features
-//! - Fetch indicators for one or more countries/regions and years or ranges
-//! - Save as CSV or JSON in a tidy, analysis-friendly schema
-//! - Quick summary statistics (min, max, mean, median)
-//! - Generate SVG/PNG charts: Line, Scatter, Line+Points, Area
+//! ## Highlights
+//! - Synchronous API client (`api::Client`)
+//! - Tidy data model (`models::DataPoint`)
+//! - Summary stats (`stats::grouped_summary`)
+//! - CSV/JSON export (`storage`)
+//! - SVG/PNG charts (`viz`) with legend placement, locale formatting, and multiple plot types
 //!
-//! ### Example
+//! ## Feature flags
+//! - `online`: enables live API tests/examples. (The library itself works without it.)
+//!
+//! ## Quick example
 //! ```no_run
 //! use world_bank_data_rust::{Client, DateSpec};
 //! use world_bank_data_rust::viz::{LegendMode, PlotKind};
 //!
+//! // 1) Fetch observations
 //! let client = Client::default();
 //! let data = client.fetch(
 //!     &["DEU".into(), "USA".into()],
@@ -21,10 +27,25 @@
 //!     Some(DateSpec::Range { start: 2010, end: 2020 }),
 //!     None,
 //! )?;
-//! world_bank_data_rust::storage::save_csv(&data, "pop_2010_2020.csv")?;
-//! world_bank_data_rust::viz::plot_chart(&data, "pop.svg", 1000, 600, "en", LegendMode::Right, "World Bank Indicator(s)", PlotKind::LinePoints)?;
-//! let stats = world_bank_data_rust::stats::grouped_summary(&data);
-//! println!("{:#?}", stats);
+//!
+//! // 2) Plot to SVG (line chart, legend on the right, English locale)
+//! world_bank_data_rust::viz::plot_chart(
+//!     &data,
+//!     "pop.svg",
+//!     1000,
+//!     600,
+//!     "en",
+//!     LegendMode::Right,
+//!     "Population (2010–2020)",
+//!     PlotKind::Line,
+//!     0.3, // loess_span (ignored unless PlotKind::Loess)
+//! )?;
+//!
+//! // 3) Print grouped summary stats
+//! let summaries = world_bank_data_rust::stats::grouped_summary(&data);
+//! for s in summaries {
+//!     println!("{:?}", s);
+//! }
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 
@@ -35,4 +56,4 @@ pub mod storage;
 pub mod viz;
 
 pub use api::Client;
-pub use models::{DateSpec, DataPoint, GroupKey};
+pub use models::{DataPoint, DateSpec, GroupKey};

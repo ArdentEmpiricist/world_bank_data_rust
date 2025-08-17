@@ -1,14 +1,65 @@
 use crate::models::{DataPoint, DateSpec, Entry, Meta};
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use reqwest::blocking::Client as HttpClient;
 use serde_json::Value;
 use std::time::Duration;
 
-/// A small sync client over the World Bank Indicators API (v2).
+/// Synchronous client for the **World Bank Indicators API (v2)**.
 ///
-/// Docs: https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation
+/// This module focuses on the `country/{codes}/indicator/{codes}` endpoint and returns
+/// results as tidy `models::DataPoint` rows. Pagination is handled automatically.
 ///
-/// This client focuses on the `/v2/country/{codes}/indicator/{codes}` endpoint.
+/// ### Notes
+/// - The API sometimes serializes `per_page` as a **string**; we accept both string/number.
+/// - When requesting **multiple indicators** at once, the API requires a `source` parameter
+///   (e.g., `source=2` for WDI). Pass it via `Client::fetch(..., Some(2))`.
+/// - Network timeouts use a sane default (30s) and can be adjusted by editing the client builder.
+///
+///
+/// Typical usage:
+/// ```no_run
+/// # use world_bank_data_rust::{Client, DateSpec};
+/// let client = Client::default();
+/// let rows = client.fetch(
+///     &["DEU".into()],
+///     &["SP.POP.TOTL".into()],
+///     Some(DateSpec::Year(2020)),
+///     None,
+/// )?;
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+
+/// Fetch indicator observations.
+///
+/// ### Arguments
+/// - `countries`: ISO2/ISO3 country codes or aggregate codes (`"DEU"`, `"USA"`, `"EUU"`…).
+///   Multiple codes are allowed; they are joined for the API (e.g., `"DEU;USA"`).
+/// - `indicators`: Indicator IDs (`"SP.POP.TOTL"`, …). Multiple allowed.
+/// - `date`: A single year (`Year(2020)`) or an inclusive range (`Range { start, end }`).
+/// - `source`: Optional numeric source id (e.g., `2` for WDI). **Required** by the API when
+///   requesting multiple indicators.
+///
+/// ### Returns
+/// A `Vec<models::DataPoint>` where one row equals one observation (country, indicator, year).
+///
+/// ### Errors
+/// - Network/HTTP error
+/// - JSON decoding error
+/// - API-level error payload (surfaced as an error)
+///
+/// ### Example
+/// ```no_run
+/// # use world_bank_data_rust::{Client, DateSpec};
+/// let cli = Client::default();
+/// let data = cli.fetch(
+///     &["DEU".into(), "USA".into()],
+///     &["SP.POP.TOTL".into()],
+///     Some(DateSpec::Range { start: 2015, end: 2020 }),
+///     None,
+/// )?;
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+
 #[derive(Debug, Clone)]
 pub struct Client {
     pub base_url: String,
@@ -42,14 +93,20 @@ impl Client {
         date: Option<DateSpec>,
         source: Option<u32>,
     ) -> Result<Vec<DataPoint>> {
-        if countries.is_empty() { bail!("at least one country/region code required"); }
-        if indicators.is_empty() { bail!("at least one indicator code required"); }
+        if countries.is_empty() {
+            bail!("at least one country/region code required");
+        }
+        if indicators.is_empty() {
+            bail!("at least one indicator code required");
+        }
 
         let country_spec = countries.join(";");
         let indicator_spec = indicators.join(";");
 
-        let mut url = format!("{}/country/{}/indicator/{}?format=json&per_page=1000",
-            self.base_url, country_spec, indicator_spec);
+        let mut url = format!(
+            "{}/country/{}/indicator/{}?format=json&per_page=1000",
+            self.base_url, country_spec, indicator_spec
+        );
         if let Some(d) = date {
             url.push_str(&format!("&date={}", d.to_query_param()));
         }
@@ -62,7 +119,10 @@ impl Client {
         let mut out: Vec<DataPoint> = Vec::new();
         loop {
             let page_url = format!("{}&page={}", url, page);
-            let resp = self.http.get(&page_url).send()
+            let resp = self
+                .http
+                .get(&page_url)
+                .send()
                 .with_context(|| format!("GET {}", page_url))?;
             if !resp.status().is_success() {
                 bail!("request failed with HTTP {}", resp.status());
@@ -70,7 +130,9 @@ impl Client {
             let v: Value = resp.json().context("decode json")?;
 
             // The API returns an array: [Meta, [Entry, ...]] or a "message" object in position 0 on error.
-            let arr = v.as_array().ok_or_else(|| anyhow::anyhow!("unexpected response shape: not a top-level array"))?;
+            let arr = v.as_array().ok_or_else(|| {
+                anyhow::anyhow!("unexpected response shape: not a top-level array")
+            })?;
             if arr.is_empty() {
                 bail!("unexpected response: empty array");
             }
@@ -80,8 +142,7 @@ impl Client {
                 bail!("world bank api error: {}", arr[0]);
             }
 
-            let meta: Meta = serde_json::from_value(arr[0].clone())
-                .context("parse meta")?;
+            let meta: Meta = serde_json::from_value(arr[0].clone()).context("parse meta")?;
             let entries: Vec<Entry> = if arr.len() > 1 {
                 serde_json::from_value(arr[1].clone()).context("parse entries")?
             } else {
@@ -91,7 +152,9 @@ impl Client {
             out.extend(entries.into_iter().map(DataPoint::from));
 
             let total_pages = meta.pages;
-            if page >= total_pages { break; }
+            if page >= total_pages {
+                break;
+            }
             page += 1;
         }
         Ok(out)

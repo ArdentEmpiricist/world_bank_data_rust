@@ -1,26 +1,59 @@
-//! Visualization utilities for world_bank_data_rust
+//! Visualization utilities: render multi-series charts to **SVG** or **PNG**.
 //!
-//! This module renders World Bank observations into **SVG** or **PNG** charts.
-//!
-//! Highlights:
-//! - Distinct color per series (**Microsoft Office palette**)
-//! - Locale-aware Y-axis labels (e.g., `30,000` vs `30.000`), whole numbers only
-//! - Legend placement: `Inside` (overlay), `Right` (panel), `Top` (band), `Bottom` (band)
-//! - Non-overlapping external legends with truncation/wrapping
-//! - Custom chart title
-//! - **Plot kinds**: Line, Scatter, Line+Points, Area, **StackedArea**, **GroupedBar**, **Loess**
-//!
-//! Typical usage (library):
-//! ```no_run
-//! # use world_bank_data_rust::viz::{self, LegendMode, PlotKind};
-//! # use world_bank_data_rust::{Client, DateSpec};
-//! # fn main() -> anyhow::Result<()> {
-//! let client = Client::default();
-//! let rows = client.fetch(&["DEU".into()], &["SP.POP.TOTL".into()], Some(DateSpec::Range{ start: 2010, end: 2020 }), None)?;
-//! viz::plot_chart(&rows, "pop.svg", 1000, 600, "de", LegendMode::Top, "Population, total (2010–2020)", PlotKind::Loess, 0.3)?;
-//! # Ok(()) }
-//! ```
-
+//! - Distinct series colors (Microsoft Office palette)
+//! - Locale-aware tick labels (`30,000` vs `30.000`), whole numbers
+//! - Legend placement: `Inside`, `Right`, `Top`, `Bottom` (non-overlapping for external legends)
+//! - Plot kinds: `Line`, `Scatter`, `LinePoints`, `Area`, `StackedArea`, `GroupedBar`, `Loess`
+//! - Custom chart title and legend handling for long labels
+///
+/// Where to place the legend.
+/// - `Inside`: overlay inside the plot (may overlap data)
+/// - `Right`: separate right-side panel (no overlap)
+/// - `Top`/`Bottom`: separate bands that wrap long labels
+/// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// pub enum LegendMode {/* … */}
+///
+/// Which chart to render.
+/// - `Line`: polyline per series
+/// - `Scatter`: markers only
+/// - `LinePoints`: line + markers
+/// - `Area`: filled area to baseline
+/// - `StackedArea`: positive stacking by year across series
+/// - `GroupedBar`: per-year grouped bars (one per series)
+/// - `Loess`: locally weighted regression (span controls smoothness)
+/// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// pub enum PlotKind {/* … */}
+///
+/// Fully-configurable chart renderer.
+///
+/// ### Arguments
+/// - `points`: tidy rows (`DataPoint`). Rows with `year == 0` or `value == None` are ignored for plotting.
+/// - `out_path`: file path ending in `.svg` or `.png`
+/// - `width`, `height`: pixel size
+/// - `locale_tag`: e.g. `"en"`, `"de"`, `"fr"`
+/// - `legend`: legend placement strategy (`LegendMode`)
+/// - `title`: chart title
+/// - `kind`: chart type (`PlotKind`)
+/// - `loess_span`: fraction `(0, 1]` used **only** for `PlotKind::Loess`
+///
+/// ### Behavior
+/// - The X axis is the **year**; the Y axis is the numeric `value`.
+/// - Axis labels use thousands-grouping from `num-format`.
+/// - When min/max on an axis are equal, the range is widened slightly to keep Plotters happy.
+///
+/// ### Example
+/// ```no_run
+/// # use world_bank_data_rust::viz::{self, LegendMode, PlotKind};
+/// # use world_bank_data_rust::models::DataPoint;
+/// let data: Vec<DataPoint> = vec![]; // fill with observations
+/// viz::plot_chart(
+///     &data, "chart.svg", 1000, 600, "en",
+///     LegendMode::Right, "My Chart", PlotKind::LinePoints, 0.3
+/// )?;
+/// # Ok::<(), anyhow::Error>(())
+/// ```
+/// pub fn plot_chart<P: AsRef<std::path::Path>>(/* … */) -> anyhow::Result<()> { /* … */
+/// }
 use crate::models::DataPoint;
 use anyhow::{Result, anyhow};
 use num_format::{Locale, ToFormattedString};

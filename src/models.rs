@@ -1,6 +1,41 @@
 use serde::{Deserialize, Serialize};
 
-/// How to specify dates in API queries.
+/// Data model and (de)serialization helpers for World Bank API responses.
+///
+/// The World Bank API returns arrays like: `[Meta, [Entry, ...]]`.
+/// We convert each `Entry` into a tidy `DataPoint` row suitable for analysis.
+///
+/// How to specify the `date` query parameter.
+///
+/// * `Year(y)` becomes `"YYYY"`
+/// * `Range { start, end }` becomes `"YYYY:YYYY"`
+#[doc = "Convert to API query string (e.g., `2010:2020`)."]
+/// ```
+/// use world_bank_data_rust::models::DateSpec;
+/// assert_eq!(DateSpec::Year(2020).to_query_param(), "2020");
+/// assert_eq!(DateSpec::Range{start: 2010, end: 2020}.to_query_param(), "2010:2020");
+/// ```
+///
+/// Metadata returned in position **0** of the API response.
+///
+/// The API sometimes encodes `per_page` as a **string**; we accept both string/number.
+#[doc = "Fields: `page`, `pages`, `per_page`, `total`."]
+///
+/// Raw entry (position **1**) as returned by the API.
+/// This mirrors the remote schema and is transformed into `DataPoint`.
+#[doc = "Prefer using `DataPoint` in downstream code."]
+///
+/// A tidy, analysis-friendly row: one observation per (country, indicator, year).
+///
+/// - `country_iso3`: ISO-3166 alpha-3 code (e.g., `DEU`).
+/// - `indicator_id`: e.g., `SP.POP.TOTL`.
+/// - `value`: numeric value (nullable).
+/// - `year`: parsed integer. If parse fails, 0 is used (and filtered out by plotting).
+///
+/// Created from `Entry` via `impl From<Entry> for DataPoint`.
+///
+/// Grouping key used in stats and plots: `(indicator_id, country_iso3)`.
+#[doc = "Derives `Eq`, `Ord` so it can be used as a `BTreeMap` key."]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DateSpec {
     /// Single year like 2020
