@@ -57,11 +57,39 @@
 use crate::models::DataPoint;
 use anyhow::{Result, anyhow};
 use num_format::{Locale, ToFormattedString};
+
 use plotters::coord::Shift;
 use plotters::prelude::*;
-use plotters::style::FontStyle;
+use plotters::series::{AreaSeries, LineSeries}; // <-- series types (features enabled above)
+use plotters::style::{FontFamily, FontStyle};
+
+use plotters_bitmap::BitMapBackend;
+use plotters_svg::SVGBackend; // <-- SVG backend // <-- Bitmap backend with `image` feature
+
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
+
+use std::sync::Once;
+
+/// One-time registration for a fallback "sans-serif" font when using the `ab_glyph` text path.
+/// Required because `ab_glyph` doesn't discover OS fonts.
+static INIT_FONTS: Once = Once::new();
+
+fn ensure_fonts_registered() {
+    // Safe to call many times; only runs once.
+    INIT_FONTS.call_once(|| {
+        // If you move/rename the file, adjust the relative path.
+        // From `src/viz.rs` → project root → `assets/DejaVuSans.ttf`
+        let _ = plotters::style::register_font(
+            "sans-serif",
+            plotters::style::FontStyle::Normal,
+            include_bytes!("../assets/DejaVuSans.ttf"),
+        );
+        // If you also add bold/italic files, you can register them too:
+        // let _ = plotters::style::register_font("sans-serif", plotters::style::FontStyle::Bold, include_bytes!("../assets/DejaVuSans-Bold.ttf"));
+        // let _ = plotters::style::register_font("sans-serif", plotters::style::FontStyle::Italic, include_bytes!("../assets/DejaVuSans-Oblique.ttf"));
+    });
+}
 
 /// Legend placement options.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -232,6 +260,7 @@ pub fn plot_chart<P: AsRef<Path>>(
     if points.is_empty() {
         return Err(anyhow!("no data to plot"));
     }
+    ensure_fonts_registered();
     let out_path = out_path.as_ref();
     let path_string = out_path.to_string_lossy().into_owned();
 
@@ -320,7 +349,9 @@ fn draw_legend_panel<DB: DrawingBackend>(
     legend_area
         .fill(&WHITE)
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-    let title_font = ("sans-serif", 16).into_font().style(FontStyle::Bold);
+    let title_font = (FontFamily::SansSerif, 16)
+        .into_font()
+        .style(FontStyle::Bold);
     legend_area
         .draw(&Text::new(title, (8, 20), title_font))
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
@@ -346,7 +377,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     .draw(&Text::new(
                         text.as_str(),
                         (text_x, y),
-                        ("sans-serif", font_px),
+                        (FontFamily::SansSerif, font_px),
                     ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 y += row_h;
@@ -374,7 +405,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     .draw(&Text::new(
                         text.as_str(),
                         (text_x, y),
-                        ("sans-serif", font_px),
+                        (FontFamily::SansSerif, font_px),
                     ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 x += item_w;
@@ -489,7 +520,7 @@ where
 
     let mut chart = ChartBuilder::on(&plot_area)
         .margin(16)
-        .caption(title, ("sans-serif", 24))
+        .caption(title, (FontFamily::SansSerif, 24))
         .set_label_area_size(LabelAreaPosition::Left, 100)
         .set_label_area_size(LabelAreaPosition::Bottom, 56)
         .build_cartesian_2d(x_min..x_max, min_val..max_val)
@@ -513,8 +544,8 @@ where
         .y_labels(y_label_count)
         .x_label_formatter(&x_label_fmt)
         .y_label_formatter(&y_label_fmt)
-        .label_style(("sans-serif", 12))
-        .axis_desc_style(("sans-serif", 16))
+        .label_style((FontFamily::SansSerif, 12))
+        .axis_desc_style((FontFamily::SansSerif, 16))
         .draw()
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
@@ -592,7 +623,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        ("sans-serif", 14),
+                                        (FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -616,7 +647,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        ("sans-serif", 14),
+                                        (FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -648,7 +679,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        ("sans-serif", 14),
+                                        (FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -674,7 +705,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        ("sans-serif", 14),
+                                        (FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -705,7 +736,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        ("sans-serif", 14),
+                                        (FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -823,7 +854,7 @@ where
             .border_style(BLACK)
             .position(SeriesLabelPosition::UpperLeft)
             .background_style(WHITE.mix(0.85))
-            .label_font(("sans-serif", 14))
+            .label_font((FontFamily::SansSerif, 14))
             .draw()
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     } else if let Some(ref legend_area) = legend_area_opt {
