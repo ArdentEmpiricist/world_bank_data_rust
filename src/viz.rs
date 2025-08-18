@@ -664,9 +664,10 @@ fn draw_legend_panel<DB: DrawingBackend>(
         }
 
         LegendMode::Top | LegendMode::Bottom => {
+            // Align first item to the chart’s X-axis start
             let start_x = axis_x_start_px;
 
-            // Metrics (must match estimator)
+            // Metrics (keep in sync with your estimator if you use one)
             let line_h: i32 = font_px as i32 + 4;
             let row_gap: i32 = 6;
             let pad_small: i32 = 6;
@@ -675,8 +676,12 @@ fn draw_legend_panel<DB: DrawingBackend>(
             let marker_to_text_gap: i32 = 12;
             let trailing_gap: i32 = 12;
 
-            // First row center (below optional title)
+            // Optional tiny vertical nudge for optical centering
+            let valign_fudge: i32 = 0;
+
+            // Title (optional)
             let mut x = start_x;
+            // Use row **center** coordinates for consistent dot/text centering
             let mut y_center = if !title.trim().is_empty() {
                 let title_y_top = pad_band;
                 legend_area
@@ -686,85 +691,87 @@ fn draw_legend_panel<DB: DrawingBackend>(
                         title_style.clone(),
                     ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-                title_y_top + 16 + 8 + (line_h / 2) // title 16px + 8px gap + half line height
+                title_y_top + title_font_px as i32 + 8 + (line_h / 2)
             } else {
                 pad_band + 8 + (line_h / 2)
             };
 
+            // Band width and per-item cap (avoid one very long label eating the row)
             let (w_u32, _) = legend_area.dim_in_pixel();
             let w = w_u32 as i32;
             let usable_row_w = w - pad_small;
+            let per_item_cap_px: i32 = ((usable_row_w - start_x) as f32 * 0.35).max(140.0) as i32;
+
+            // Center-anchored text style (so y is the line center)
             let label_style_center: TextStyle = TextStyle::from((FontFamily::SansSerif, font_px))
                 .pos(Pos::new(HPos::Left, VPos::Center));
 
-            // Max text width if item occupies a fresh row
-            let text_max_fresh = (usable_row_w - start_x)
-                .max(40)
-                .saturating_sub((marker_to_text_gap + marker_radius + trailing_gap) as i32)
-                as u32;
+            // Helper to compute a wrapped block (width/height/lines) given a text width cap
+            let mut make_block = |label: &str, text_cap_px: i32| {
+                let cap = text_cap_px.max(40) as u32;
+                let lines = wrap_text_to_width(label, font_px, cap);
+                let max_line_w = lines
+                    .iter()
+                    .map(|s| estimate_text_width_px(s, font_px) as i32)
+                    .max()
+                    .unwrap_or(0);
+                let block_w = marker_to_text_gap + marker_radius + max_line_w + trailing_gap;
+                let block_h = (lines.len().max(1) as i32) * line_h;
+                (block_w, block_h, lines)
+            };
 
             for (label, color) in items {
-                let full_text_w = estimate_text_width_px(label, font_px) as i32;
-                let mut block_w = marker_to_text_gap + marker_radius + full_text_w + trailing_gap;
-                let mut block_h = line_h;
-                let mut lines: Option<Vec<String>> = None;
+                // Remaining width on current line and the max text width we allow on THIS line
+                let remaining_line_px = (usable_row_w - x).max(40);
+                let text_cap_now =
+                    remaining_line_px - (marker_to_text_gap + marker_radius + trailing_gap);
+                // Cap the item’s text width to avoid one label dominating
+                let text_cap_now = text_cap_now.min(per_item_cap_px);
 
-                // If the single item won't fit on a fresh row, wrap within the item
-                if block_w > (usable_row_w - start_x) {
-                    let wrapped = wrap_text_to_width(label, font_px, text_max_fresh);
-                    let max_line_w = wrapped
-                        .iter()
-                        .map(|s| estimate_text_width_px(s, font_px) as i32)
-                        .max()
-                        .unwrap_or(0);
-                    block_w = marker_to_text_gap + marker_radius + max_line_w + trailing_gap;
-                    block_h = (wrapped.len().max(1) as i32) * line_h;
-                    lines = Some(wrapped);
-                }
+                // First try: wrap to the remaining space on the current line
+                let (mut block_w, mut block_h, mut lines) = make_block(label, text_cap_now);
 
-                // If it doesn't fit in the current row, move to next row center
+                // If even the wrapped block doesn't fit, move to a fresh row and re-wrap
                 if x + block_w > usable_row_w {
                     x = start_x;
-                    y_center += block_h + row_gap;
+                    y_center += block_h + row_gap; // step to next row center
+
+                    let fresh_text_cap = ((usable_row_w - start_x)
+                        - (marker_to_text_gap + marker_radius + trailing_gap))
+                        .min(per_item_cap_px);
+                    let (bw2, bh2, lines2) = make_block(label, fresh_text_cap);
+                    block_w = bw2;
+                    block_h = bh2;
+                    lines = lines2;
                 }
 
-                // Draw item at (x, y_center)
+                // Draw at (x, y_center)
                 let text_x = x;
                 let dot_x = (text_x - marker_to_text_gap).max(0);
+                let yc = y_center + valign_fudge;
 
                 legend_area
                     .draw(&Circle::new(
-                        (dot_x, y_center),
+                        (dot_x, yc),
                         marker_radius,
                         color.clone().filled(),
                     ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-                if let Some(lines) = lines {
-                    // Multi-line block: center the whole block on y_center
-                    let top = y_center - block_h / 2;
-                    for (i, ln) in lines.iter().enumerate() {
-                        let line_center_y = top + (i as i32) * line_h + line_h / 2;
-                        legend_area
-                            .draw(&Text::new(
-                                ln.as_str(),
-                                (text_x, line_center_y),
-                                label_style_center.clone(),
-                            ))
-                            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-                    }
-                } else {
-                    // Single-line
+                // Center the whole text block around y_center
+                let top = y_center - block_h / 2;
+                for (i, ln) in lines.iter().enumerate() {
+                    let line_center_y = top + (i as i32) * line_h + line_h / 2 + valign_fudge;
                     legend_area
                         .draw(&Text::new(
-                            label.as_str(),
-                            (text_x, y_center),
+                            ln.as_str(),
+                            (text_x, line_center_y),
                             label_style_center.clone(),
                         ))
                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 }
 
-                // Advance x for flow on this row
+                // Flow to the right
                 x += block_w;
             }
         }
