@@ -1,5 +1,4 @@
 
-[![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](#)
 [![Crates.io](https://img.shields.io/crates/v/world_bank_data_rust?label=Crates.io)](https://crates.io/crates/world_bank_data_rust)
 [![rust-clippy analyze](https://img.shields.io/github/actions/workflow/status/ardentempiricist/world_bank_data_rust/rust-clippy.yml?label=Rust%20Clippy)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/rust-clippy.yml)
 [![Deploy](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml)
