@@ -403,53 +403,63 @@ fn truncate_to_width(text: &str, font_px: u32, max_px: u32) -> String {
 }
 
 /// Draw a legend either on the right (single column), top (flow), or bottom (flow).
-/// - Uses a **circle** marker centered on the text midline (no vertical misalignment).
-/// - Truncates **only** if a single label cannot fit on a *fresh* line.
-/// - Recomputes widths after wrapping so entries are not unnecessarily cut short.
+/// Spacing rules:
+/// - Top/Bottom: text starts aligned with the plot’s X-axis start (first item),
+///   and subsequent items flow horizontally using the current `x`.
+/// - Right: a small gutter keeps it visually close to the plot.
+/// Truncation only happens if an item cannot fit even on a fresh line.
 fn draw_legend_panel<DB: DrawingBackend>(
     legend_area: &DrawingArea<DB, Shift>,
     items: &[(String, RGBAColor)],
     title: &str,
     placement: LegendMode,
+    axis_x_start_px: i32,
 ) -> anyhow::Result<()> {
     legend_area
         .fill(&WHITE)
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-
-    // Title stays with default baseline alignment (looks fine and consistent)
-    let title_font = (FontFamily::SansSerif, 16)
-        .into_font()
-        .style(FontStyle::Bold);
-    legend_area
-        .draw(&Text::new(title, (8, 20), title_font))
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     let (w_u32, _) = legend_area.dim_in_pixel();
     let w = w_u32 as i32;
 
     // Layout constants
-    let pad_x: i32 = 8;
-    let start_y: i32 = 44;
-    let font_px: u32 = 14;
-    let row_h: i32 = 22;
-
-    // Marker + gaps and width heuristic fudge
+    let font_px: u32 = 14; // legend row font
+    let row_h: i32 = 22; // legend row height
     let marker_radius: i32 = 4;
     let marker_to_text_gap: i32 = 12;
     let trailing_gap: i32 = 12;
-    let marker_block_w: i32 = 8 + marker_radius + marker_to_text_gap; // ~24–28px visually
     let fudge_px: u32 = 6;
 
-    // Legend label text style: **Left/Center** anchors the text’s vertical center on y
+    // Title style: anchor at TOP so the y we pass is the top of the text box
+    let title_font_px: u32 = 16;
+    let title_style: TextStyle = TextStyle::from((FontFamily::SansSerif, title_font_px))
+        .pos(Pos::new(HPos::Left, VPos::Top));
+
+    // Legend label text style: vertically centered on y, left-aligned on x
     let label_style: TextStyle =
         TextStyle::from((FontFamily::SansSerif, font_px)).pos(Pos::new(HPos::Left, VPos::Center));
 
     match placement {
         LegendMode::Right => {
-            // Single column; only truncate if label doesn’t fit panel width
-            let mut y = start_y;
+            // Small gutter keeps it close to the plot
+            let pad_x: i32 = 6;
+
+            // Draw title at top-left, then compute the first row y
+            let title_x = pad_x;
+            let title_y_top = 8; // small top padding
+            legend_area
+                .draw(&Text::new(
+                    title,
+                    (title_x, title_y_top),
+                    title_style.clone(),
+                ))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+            let mut y = title_y_top + title_font_px as i32 + 8; // 8px gap below title
+
+            // Only truncate when it can't fit within the legend panel width
+            let max_text_w = (w - 2 * pad_x - 24).max(40) as u32;
+
             for (label, color) in items {
-                let max_text_w = (w - 48).max(40) as u32;
                 let label_w = estimate_text_width_px(label, font_px);
                 let text = if label_w.saturating_sub(fudge_px) > max_text_w {
                     truncate_to_width(label, font_px, max_text_w)
@@ -460,7 +470,6 @@ fn draw_legend_panel<DB: DrawingBackend>(
                 let marker_x = pad_x + 12;
                 let text_x = pad_x + 24;
 
-                // Circle is centered at y; text is also centered vertically at y
                 legend_area
                     .draw(&Circle::new(
                         (marker_x, y),
@@ -475,30 +484,44 @@ fn draw_legend_panel<DB: DrawingBackend>(
                 y += row_h;
             }
         }
+
         LegendMode::Top | LegendMode::Bottom => {
-            // Flow layout with wrap; re-measure after wrapping and only truncate if needed.
-            let mut x = pad_x;
-            let mut y = start_y;
+            // First item’s text is aligned to the chart’s X-axis start
+            let start_x: i32 = axis_x_start_px;
+
+            // Draw title at the same left edge as the plot’s X axis
+            let title_x = start_x;
+            let title_y_top = 8; // small top padding inside the band
+            legend_area
+                .draw(&Text::new(
+                    title,
+                    (title_x, title_y_top),
+                    title_style.clone(),
+                ))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+            // First row y: directly under the title box with an 8px gap
+            let mut x = start_x;
+            let mut y = title_y_top + title_font_px as i32 + 8;
 
             for (label, color) in items {
-                // 1) Width remaining on current line
-                let line_limit_now = (w - x - pad_x).max(40) as u32;
+                // Width remaining on current line (legend band)
+                let line_limit_now = (w - x - 8).max(40) as u32;
+
                 let full_text_w = estimate_text_width_px(label, font_px);
+                // Item width on this line: [dot left of text] + [text] + [trailing gap]
+                let mut item_w_now =
+                    (marker_to_text_gap + marker_radius + full_text_w as i32 + trailing_gap)
+                        .max(40);
 
-                // Item width if drawn **untruncated** on this line
-                let mut item_w_now = marker_block_w + full_text_w as i32 + trailing_gap;
-
-                // 2) Wrap if it doesn't fit, then recompute on fresh line
-                if x + item_w_now > (w - pad_x) {
-                    x = pad_x;
+                // Wrap if it doesn't fit, then re-measure on a fresh line
+                if x + item_w_now > (w - 8) {
+                    x = start_x;
                     y += row_h;
 
-                    let line_limit_fresh = (w - x - pad_x).max(40) as u32;
-                    item_w_now = marker_block_w + full_text_w as i32 + trailing_gap;
-
-                    // 3) Only truncate if even on a fresh line the full label is too wide
-                    let text_max_fresh =
-                        line_limit_fresh.saturating_sub((marker_block_w + trailing_gap) as u32);
+                    let line_limit_fresh = (w - x - 8).max(40) as u32;
+                    let text_max_fresh = line_limit_fresh
+                        .saturating_sub((marker_to_text_gap + marker_radius + trailing_gap) as u32);
 
                     let text_to_draw = if full_text_w.saturating_sub(fudge_px) > text_max_fresh {
                         truncate_to_width(label, font_px, text_max_fresh)
@@ -507,14 +530,17 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     };
 
                     let text_w = estimate_text_width_px(&text_to_draw, font_px) as i32;
-                    let final_item_w = (marker_block_w + text_w + trailing_gap).min(w - 2 * pad_x);
+                    let final_item_w = (marker_to_text_gap + marker_radius + text_w + trailing_gap)
+                        .min(w - x - 8)
+                        .max(40);
 
-                    let marker_x = x + 12;
-                    let text_x = x + marker_block_w;
+                    // Draw at the current x
+                    let text_x = x;
+                    let dot_x = (text_x - marker_to_text_gap).max(0);
 
                     legend_area
                         .draw(&Circle::new(
-                            (marker_x, y),
+                            (dot_x, y),
                             marker_radius,
                             color.clone().filled(),
                         ))
@@ -531,13 +557,13 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     continue;
                 }
 
-                // 4) Fits on current line without wrapping — render full label, no truncation
-                let marker_x = x + 12;
-                let text_x = x + marker_block_w;
+                // Fits on current line → draw full label at current x
+                let text_x = x;
+                let dot_x = (text_x - marker_to_text_gap).max(0);
 
                 legend_area
                     .draw(&Circle::new(
-                        (marker_x, y),
+                        (dot_x, y),
                         marker_radius,
                         color.clone().filled(),
                     ))
@@ -549,6 +575,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
                 x += item_w_now;
             }
         }
+
         LegendMode::Inside => unreachable!("legend panel is not used for Inside mode"),
     }
 
@@ -609,7 +636,6 @@ fn loess_series(xs: &[f64], ys: &[f64], span: f64) -> Vec<f64> {
     yhat
 }
 
-/// Draw chart with chosen legend placement, custom title, plot kind, and LOESS span.
 fn draw_chart<DB>(
     root: DrawingArea<DB, Shift>,
     points: &[DataPoint],
@@ -653,70 +679,10 @@ where
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     }
 
-    // ---- Axis-unit scaling (NEW) -------------------------------------------
-    // Decide one consistent scale for the whole chart and reflect it in the Y-axis label.
+    // ---- Axis-unit scaling (already in your file) --------------------------------
     let max_abs = min_val.abs().max(max_val.abs());
     let (yscale, unit_label) = choose_axis_scale(max_abs);
-    // ------------------------------------------------------------------------
-
-    // Decide how many Y labels you want (you currently use 10).
-    let y_label_count = 10usize;
-
-    // Compute left label area **dynamically** using the scaled Y range.
-    let left_label_width_px = compute_left_label_area_px(
-        min_val / yscale,
-        max_val / yscale,
-        y_label_count,
-        12, // axis label font size you use below
-    );
-
-    // NOTE: we use f64 on X to allow grouped bar fractional offsets
-    let x_min = min_year as f64;
-    let x_max = max_year as f64;
-
-    // Build chart with **scaled** Y range
-    let mut chart = ChartBuilder::on(&plot_area)
-        .margin(16)
-        .caption(title, (plotters::style::FontFamily::SansSerif, 24))
-        .set_label_area_size(LabelAreaPosition::Left, left_label_width_px)
-        .set_label_area_size(LabelAreaPosition::Bottom, 56)
-        .build_cartesian_2d(x_min..x_max, (min_val / yscale)..(max_val / yscale))
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-
-    // X ticks (years) stay as integers with locale-aware thousands
-    let x_label_fmt = |x: &f64| (x.round() as i32).to_string();
-    let x_label_count = ((max_year - min_year + 1) as usize).min(12);
-
-    // Y ticks: now show short decimals **after scaling** and put the unit in the axis label.
-    let y_label_fmt_scaled = |v: &f64| {
-        let a = v.abs();
-        let prec = if a >= 100.0 {
-            0
-        } else if a >= 10.0 {
-            1
-        } else {
-            2
-        };
-        format!("{:.*}", prec, *v) // small values → a couple decimals; big → none
-    };
-    let y_label_count = 10usize;
-
-    chart
-        .configure_mesh()
-        .x_desc("Year")
-        .y_desc(if unit_label.is_empty() {
-            "Value".to_string()
-        } else {
-            format!("Value ({})", unit_label)
-        })
-        .x_labels(x_label_count)
-        .y_labels(y_label_count)
-        .x_label_formatter(&x_label_fmt)
-        .y_label_formatter(&y_label_fmt_scaled)
-        .label_style((plotters::style::FontFamily::SansSerif, 12))
-        .axis_desc_style((plotters::style::FontFamily::SansSerif, 16))
-        .draw()
-        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+    // -----------------------------------------------------------------------------
 
     // Build name lookups for long legend labels
     use std::collections::HashMap;
@@ -731,7 +697,88 @@ where
             .or_insert_with(|| p.country_name.clone());
     }
 
-    // Group as (ISO3, indicator_id) -> Vec<(year, value)>
+    // ---- Effective title: if empty or placeholder, derive from indicator names ---
+    let effective_title: String = {
+        let t = title.trim();
+        if t.is_empty() || t == "World Bank Indicator(s)" {
+            use std::collections::BTreeSet;
+            let mut names: BTreeSet<&str> =
+                points.iter().map(|p| p.indicator_name.as_str()).collect();
+            if names.is_empty() {
+                "World Bank Series".to_string()
+            } else if names.len() == 1 {
+                names.iter().next().unwrap().to_string()
+            } else if names.len() <= 3 {
+                names.into_iter().collect::<Vec<_>>().join(", ")
+            } else {
+                let first = names.iter().next().unwrap();
+                let more = names.len() - 1;
+                format!("{first} + {more} more")
+            }
+        } else {
+            t.to_string()
+        }
+    };
+
+    // NOTE: we use f64 on X to allow grouped bar fractional offsets
+    let x_min = min_year as f64;
+    let x_max = max_year as f64;
+
+    let y_label_count = 10usize; // keep your current density (used below too)
+    let left_label_width_px = compute_left_label_area_px(
+        min_val / yscale,
+        max_val / yscale,
+        y_label_count,
+        12, // font size you use in .label_style for axis ticks
+    );
+
+    // X-axis left pixel: chart left margin + left label area
+    let axis_x_start_px: i32 = 16 + left_label_width_px as i32;
+
+    let mut chart = ChartBuilder::on(&plot_area)
+        .margin(16)
+        .caption(effective_title, (FontFamily::SansSerif, 24))
+        .set_label_area_size(LabelAreaPosition::Left, left_label_width_px) // ← dynamic
+        .set_label_area_size(LabelAreaPosition::Bottom, 56)
+        .build_cartesian_2d(x_min..x_max, (min_val / yscale)..(max_val / yscale))
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    // X ticks (years) stay as integers
+    let x_label_fmt = |x: &f64| (x.round() as i32).to_string();
+    let x_label_count = ((max_year - min_year + 1) as usize).min(12);
+
+    // Y ticks after scaling: short decimals
+    let y_label_fmt_scaled = |v: &f64| {
+        let a = v.abs();
+        let prec = if a >= 100.0 {
+            0
+        } else if a >= 10.0 {
+            1
+        } else {
+            2
+        };
+        format!("{:.*}", prec, *v)
+    };
+    let y_label_count = 10usize;
+
+    chart
+        .configure_mesh()
+        .x_desc("Year")
+        .y_desc(if unit_label.is_empty() {
+            "Value".to_string()
+        } else {
+            format!("Value ({})", unit_label)
+        })
+        .x_labels(((max_year - min_year + 1) as usize).min(12))
+        .y_labels(y_label_count) // ← same value we used to compute width
+        .x_label_formatter(&x_label_fmt)
+        .y_label_formatter(&y_label_fmt_scaled)
+        .label_style((FontFamily::SansSerif, 12))
+        .axis_desc_style((FontFamily::SansSerif, 16))
+        .draw()
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    // Group as (ISO3, indicator_id) -> Vec<(year, value)>, sorted by year
     use std::collections::BTreeMap;
     let mut groups: BTreeMap<(String, String), Vec<(i32, f64)>> = BTreeMap::new();
     for p in points {
@@ -748,7 +795,31 @@ where
         series.sort_by_key(|(y, _)| *y);
     }
 
-    // Prepare legend items
+    // ---- Build a sorted list of series by *country name*, then indicator name ----
+    // Each entry: (iso3, indicator_id, country_label, indicator_label, series)
+    let mut series_list: Vec<(String, String, String, String, Vec<(i32, f64)>)> = Vec::new();
+    for ((iso3, indicator_id), series) in groups.iter() {
+        let country_label = country_name_by_iso3
+            .get(iso3)
+            .cloned()
+            .unwrap_or_else(|| iso3.clone());
+        let indicator_label = indicator_name_by_id
+            .get(indicator_id)
+            .cloned()
+            .unwrap_or_else(|| indicator_id.clone());
+        series_list.push((
+            iso3.clone(),
+            indicator_id.clone(),
+            country_label,
+            indicator_label,
+            series.clone(),
+        ));
+    }
+    // Sort by the *printed* country name, then indicator name
+    series_list.sort_by(|a, b| a.2.cmp(&b.2).then(a.3.cmp(&b.3)));
+    // ------------------------------------------------------------------------------
+
+    // Prepare legend items (external legends)
     let mut legend_items: Vec<(String, RGBAColor)> = Vec::new();
     let inside_mode = matches!(legend, LegendMode::Inside);
 
@@ -759,16 +830,10 @@ where
         | PlotKind::LinePoints
         | PlotKind::Area
         | PlotKind::Loess => {
-            for (idx, ((country_iso3, indicator_id), series)) in groups.iter().enumerate() {
+            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+                series_list.iter().enumerate()
+            {
                 let color = office_color(idx);
-                let country_label = country_name_by_iso3
-                    .get(country_iso3)
-                    .cloned()
-                    .unwrap_or_else(|| country_iso3.clone());
-                let indicator_label = indicator_name_by_id
-                    .get(indicator_id)
-                    .cloned()
-                    .unwrap_or_else(|| indicator_id.clone());
                 let legend_label = format!("{} — {}", country_label, indicator_label);
 
                 // Convert to f64 X and **scale Y**
@@ -860,7 +925,6 @@ where
                         }
                     }
                     PlotKind::Area => {
-                        // Baseline scaled accordingly
                         let baseline_scaled = 0.0f64.min(min_val) / yscale;
                         let fill = color.clone().mix(0.20).filled();
                         let border = color.clone().stroke_width(1);
@@ -930,20 +994,13 @@ where
         PlotKind::StackedArea => {
             // Build a union of years
             let years_all: Vec<i32> = (min_year..=max_year).collect();
-            // Cumulative positive stacks per year (unscaled); we'll scale at draw time.
             let mut cum: Vec<f64> = vec![0.0; years_all.len()];
 
-            // To keep legend order consistent, iterate groups in order
-            for (idx, ((country_iso3, indicator_id), series)) in groups.iter().enumerate() {
+            // Iterate in *name-sorted* order for consistent legend & stacking
+            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+                series_list.iter().enumerate()
+            {
                 let color = office_color(idx);
-                let country_label = country_name_by_iso3
-                    .get(country_iso3)
-                    .cloned()
-                    .unwrap_or_else(|| country_iso3.clone());
-                let indicator_label = indicator_name_by_id
-                    .get(indicator_id)
-                    .cloned()
-                    .unwrap_or_else(|| indicator_id.clone());
                 let legend_label = format!("{} — {}", country_label, indicator_label);
 
                 // Map series to full year grid, missing -> 0.0
@@ -953,8 +1010,7 @@ where
                         vals[(*y - min_year) as usize] = (*v).max(0.0); // stack positive part
                     }
                 }
-
-                // Build upper & lower in **unscaled** units then scale when drawing
+                // Build upper curve by adding to cumulative
                 let mut upper: Vec<(f64, f64)> = Vec::with_capacity(vals.len());
                 let mut lower: Vec<(f64, f64)> = Vec::with_capacity(vals.len());
                 for (i, v) in vals.iter().enumerate() {
@@ -963,8 +1019,7 @@ where
                     cum[i] += *v;
                     upper.push((x, cum[i]));
                 }
-
-                // Create polygon points: lower (forward) + upper (reverse), **scaled**
+                // polygon: lower (forward) + upper (reverse), **scaled**
                 let mut poly: Vec<(f64, f64)> = Vec::with_capacity(upper.len() * 2);
                 poly.extend(lower.iter().map(|(x, y)| (*x, *y / yscale)));
                 poly.extend(upper.iter().rev().map(|(x, y)| (*x, *y / yscale)));
@@ -984,28 +1039,18 @@ where
                     )))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-                if inside_mode {
-                    legend_items.push((legend_label, color));
-                } else {
-                    legend_items.push((legend_label, color));
-                }
+                legend_items.push((legend_label, color));
             }
         }
         PlotKind::GroupedBar => {
-            let n_series = groups.len().max(1);
+            let n_series = series_list.len().max(1);
             let group_width = 0.8f64; // width of a full year band
             let bar_w = group_width / n_series as f64;
 
-            for (idx, ((country_iso3, indicator_id), series)) in groups.iter().enumerate() {
+            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+                series_list.iter().enumerate()
+            {
                 let color = office_color(idx);
-                let country_label = country_name_by_iso3
-                    .get(country_iso3)
-                    .cloned()
-                    .unwrap_or_else(|| country_iso3.clone());
-                let indicator_label = indicator_name_by_id
-                    .get(indicator_id)
-                    .cloned()
-                    .unwrap_or_else(|| indicator_id.clone());
                 let legend_label = format!("{} — {}", country_label, indicator_label);
 
                 for (y, v) in series.iter() {
@@ -1026,7 +1071,7 @@ where
         }
     }
 
-    if inside_mode {
+    if matches!(legend, LegendMode::Inside) {
         chart
             .configure_series_labels()
             .border_style(BLACK)
@@ -1036,7 +1081,13 @@ where
             .draw()
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     } else if let Some(ref legend_area) = legend_area_opt {
-        draw_legend_panel(legend_area, &legend_items, "Legend", legend)?;
+        draw_legend_panel(
+            legend_area,
+            &legend_items,
+            "", //removed title as per best practices for charts
+            legend,
+            axis_x_start_px,
+        )?;
     }
 
     plot_area
