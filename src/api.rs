@@ -135,7 +135,7 @@ impl Client {
             for backoff_ms in [100u64, 300, 700] {
                 match self.http.get(u).send() {
                     Ok(r) if r.status().is_success() => {
-                        return Ok(r.json().context("decode json")?);
+                        return r.json().context("decode json");
                     }
                     Ok(r) if r.status().is_server_error() => { /* retry */ }
                     Ok(r) => bail!("request failed with HTTP {}", r.status()),
