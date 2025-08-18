@@ -3,7 +3,6 @@
 [![rust-clippy analyze](https://img.shields.io/github/actions/workflow/status/ardentempiricist/world_bank_data_rust/rust-clippy.yml?label=Rust%20Clippy)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/rust-clippy.yml)
 [![Deploy](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml)
 [![Documentation](https://docs.rs/world_bank_data_rust/badge.svg)](https://docs.rs/world_bank_data_rust/)
-[![Crates.io](https://img.shields.io/crates/l/world_bank_data_rust?label=License)](https://github.com/LazyEmpiricist/world_bank_data_rust/blob/main/LICENSE)
 [![Crates.io](https://img.shields.io/crates/d/world_bank_data_rust?color=darkblue&label=Downloads)](https://crates.io/crates/world_bank_data_rust)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
