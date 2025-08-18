@@ -94,6 +94,51 @@ fn ensure_fonts_registered() {
     });
 }
 
+/// Compute a tight left label area width for the Y axis (in pixels),
+/// based on the formatted tick labels that will appear.
+/// - `ymin_scaled..ymax_scaled`: the **scaled** Y range you pass to Plotters
+/// - `ticks`: how many Y labels you plan to show (e.g., 10)
+/// - `font_px`: font size used for axis labels (e.g., 12)
+///
+/// Returns a width clamped to a sensible range to avoid extremes.
+fn compute_left_label_area_px(
+    ymin_scaled: f64,
+    ymax_scaled: f64,
+    ticks: usize,
+    font_px: u32,
+) -> u32 {
+    // This must match the formatter you use in .configure_mesh().y_label_formatter(...)
+    let y_label_fmt = |v: f64| {
+        let a = v.abs();
+        let prec = if a >= 100.0 {
+            0
+        } else if a >= 10.0 {
+            1
+        } else {
+            2
+        };
+        format!("{:.*}", prec, v)
+    };
+
+    let mut max_px = 0u32;
+    // Sample the same number of tick positions as you request from Plotters.
+    for i in 0..=ticks {
+        let t = if ticks == 0 {
+            0.0
+        } else {
+            i as f64 / ticks as f64
+        };
+        let v = ymin_scaled + (ymax_scaled - ymin_scaled) * t;
+        let s = y_label_fmt(v);
+        max_px = max_px.max(estimate_text_width_px(&s, font_px));
+    }
+
+    // Add padding for tick marks & a little breathing room.
+    // Clamp to avoid silly extremes; tune these if you like.
+    let with_padding = max_px.saturating_add(18);
+    with_padding.clamp(48, 140)
+}
+
 /// Legend placement options.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LegendMode {
@@ -144,6 +189,22 @@ const OFFICE10: [RGBColor; 10] = [
 #[inline]
 fn office_color(idx: usize) -> RGBAColor {
     OFFICE10[idx % OFFICE10.len()].to_rgba()
+}
+
+/// Pick a single Y-axis scale and its human label based on the overall magnitude.
+/// Returns (scale, label), e.g. (1e6, "millions").
+fn choose_axis_scale(max_abs: f64) -> (f64, &'static str) {
+    if max_abs >= 1.0e12 {
+        (1.0e12, "trillions")
+    } else if max_abs >= 1.0e9 {
+        (1.0e9, "billions")
+    } else if max_abs >= 1.0e6 {
+        (1.0e6, "millions")
+    } else if max_abs >= 1.0e3 {
+        (1.0e3, "thousands")
+    } else {
+        (1.0, "")
+    }
 }
 
 /// Map a user-provided locale tag to a `num_format::Locale` and its decimal separator char.
@@ -342,7 +403,8 @@ fn truncate_to_width(text: &str, font_px: u32, max_px: u32) -> String {
 
 /// Draw a legend either on the right (single column), top (flow), or bottom (flow).
 /// - Uses a centered **circle** marker aligned with the text baseline.
-/// - Truncates labels to avoid spilling outside the legend area.
+/// - Truncates **only** if a single label cannot fit on a *fresh* line.
+/// - Recomputes widths after wrapping so entries are not unnecessarily cut short.
 fn draw_legend_panel<DB: DrawingBackend>(
     legend_area: &DrawingArea<DB, Shift>,
     items: &[(String, RGBAColor)],
@@ -352,6 +414,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
     legend_area
         .fill(&WHITE)
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
     let title_font = (FontFamily::SansSerif, 16)
         .into_font()
         .style(FontStyle::Bold);
@@ -359,22 +422,45 @@ fn draw_legend_panel<DB: DrawingBackend>(
         .draw(&Text::new(title, (8, 20), title_font))
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    let (w, _) = legend_area.dim_in_pixel();
+    let (w_u32, _) = legend_area.dim_in_pixel();
+    let w = w_u32 as i32;
+
+    // Layout constants
     let pad_x: i32 = 8;
     let start_y: i32 = 44;
     let font_px: u32 = 14;
     let row_h: i32 = 22;
 
+    // Marker + gap before text + trailing gap after text
+    let marker_radius: i32 = 4;
+    let marker_to_text_gap: i32 = 12;
+    let trailing_gap: i32 = 12;
+    let marker_block_w: i32 = 8 /*pad for marker placement*/ + marker_radius + marker_to_text_gap; // ~24–28px visually
+
+    // Small fudge to reduce over-estimation from the width heuristic
+    let fudge_px: u32 = 6;
+
     match placement {
         LegendMode::Right => {
+            // Single column; only truncate if label doesn’t fit panel width
             let mut y = start_y;
             for (label, color) in items {
-                let max_text_w = w.saturating_sub(48);
-                let text = truncate_to_width(label, font_px, max_text_w);
+                let max_text_w = (w - 48).max(40) as u32; // safe bounds
+                let label_w = estimate_text_width_px(label, font_px);
+                let text = if label_w.saturating_sub(fudge_px) > max_text_w {
+                    truncate_to_width(label, font_px, max_text_w)
+                } else {
+                    label.clone()
+                };
                 let marker_x = pad_x + 12;
                 let text_x = pad_x + 24;
+
                 legend_area
-                    .draw(&Circle::new((marker_x, y), 4, color.clone().filled()))
+                    .draw(&Circle::new(
+                        (marker_x, y),
+                        marker_radius,
+                        color.clone().filled(),
+                    ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 legend_area
                     .draw(&Text::new(
@@ -387,31 +473,88 @@ fn draw_legend_panel<DB: DrawingBackend>(
             }
         }
         LegendMode::Top | LegendMode::Bottom => {
+            // Flow layout with wrap. We *recompute* widths after a wrap and only
+            // truncate if the label can’t fit even on a fresh line.
             let mut x = pad_x;
             let mut y = start_y;
+
             for (label, color) in items {
-                let max_item_w = (w as i32 - x - pad_x).max(40) as u32;
-                let text_max = max_item_w.saturating_sub(28);
-                let text = truncate_to_width(label, font_px, text_max);
-                let text_w = estimate_text_width_px(&text, font_px) as i32;
-                let item_w = (28 + text_w + 12).min(w as i32 - 2 * pad_x);
-                if x + item_w > (w as i32 - pad_x) {
+                // 1) Compute how much width remains on the current line.
+                let line_limit_now = (w - x - pad_x).max(40) as u32;
+                // Full label width (rough measure)
+                let full_text_w = estimate_text_width_px(label, font_px);
+
+                // Minimum width for this legend item if rendered untruncated on *this* line:
+                // marker block + text + trailing gap
+                let mut item_w_now = marker_block_w + full_text_w as i32 + trailing_gap;
+
+                // 2) If it doesn't fit, wrap to new line and recompute without truncation.
+                if x + item_w_now > (w - pad_x) {
                     x = pad_x;
                     y += row_h;
+
+                    // Recompute for a fresh line (max width available)
+                    let line_limit_fresh = (w - x - pad_x).max(40) as u32;
+                    item_w_now = marker_block_w + full_text_w as i32 + trailing_gap;
+
+                    // 3) Only truncate if even on a fresh line the full label is too wide.
+                    let text_max_fresh =
+                        line_limit_fresh.saturating_sub((marker_block_w + trailing_gap) as u32);
+
+                    let text_to_draw = if full_text_w.saturating_sub(fudge_px) > text_max_fresh {
+                        // Now actually truncate to the fresh line’s capacity
+                        truncate_to_width(label, font_px, text_max_fresh)
+                    } else {
+                        label.clone()
+                    };
+
+                    let text_w = estimate_text_width_px(&text_to_draw, font_px) as i32;
+                    let final_item_w = (marker_block_w + text_w + trailing_gap).min(w - 2 * pad_x);
+
+                    // Draw
+                    let marker_x = x + 12;
+                    let text_x = x + marker_block_w;
+                    legend_area
+                        .draw(&Circle::new(
+                            (marker_x, y),
+                            marker_radius,
+                            color.clone().filled(),
+                        ))
+                        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                    legend_area
+                        .draw(&Text::new(
+                            text_to_draw.as_str(),
+                            (text_x, y),
+                            (FontFamily::SansSerif, font_px),
+                        ))
+                        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+                    x += final_item_w;
+                    continue;
                 }
+
+                // 4) Fits on current line without wrapping — render without truncation.
+                // (If you still want truncation for *this* line only when overflowing, do it here,
+                //  but we avoid it so labels remain complete when space exists.)
                 let marker_x = x + 12;
-                let text_x = x + 24;
+                let text_x = x + marker_block_w;
+
                 legend_area
-                    .draw(&Circle::new((marker_x, y), 4, color.clone().filled()))
+                    .draw(&Circle::new(
+                        (marker_x, y),
+                        marker_radius,
+                        color.clone().filled(),
+                    ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 legend_area
                     .draw(&Text::new(
-                        text.as_str(),
+                        label.as_str(),
                         (text_x, y),
                         (FontFamily::SansSerif, font_px),
                     ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-                x += item_w;
+
+                x += item_w_now;
             }
         }
         LegendMode::Inside => unreachable!("legend panel is not used for Inside mode"),
@@ -481,7 +624,7 @@ fn draw_chart<DB>(
     max_year: i32,
     min_val: f64,
     max_val: f64,
-    num_locale: &Locale,
+    num_locale: &num_format::Locale,
     legend: LegendMode,
     title: &str,
     kind: PlotKind,
@@ -517,42 +660,73 @@ where
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     }
 
+    // ---- Axis-unit scaling (NEW) -------------------------------------------
+    // Decide one consistent scale for the whole chart and reflect it in the Y-axis label.
+    let max_abs = min_val.abs().max(max_val.abs());
+    let (yscale, unit_label) = choose_axis_scale(max_abs);
+    // ------------------------------------------------------------------------
+
+    // Decide how many Y labels you want (you currently use 10).
+    let y_label_count = 10usize;
+
+    // Compute left label area **dynamically** using the scaled Y range.
+    let left_label_width_px = compute_left_label_area_px(
+        min_val / yscale,
+        max_val / yscale,
+        y_label_count,
+        12, // axis label font size you use below
+    );
+
     // NOTE: we use f64 on X to allow grouped bar fractional offsets
     let x_min = min_year as f64;
     let x_max = max_year as f64;
 
+    // Build chart with **scaled** Y range
     let mut chart = ChartBuilder::on(&plot_area)
         .margin(16)
-        .caption(title, (FontFamily::SansSerif, 24))
-        .set_label_area_size(LabelAreaPosition::Left, 100)
+        .caption(title, (plotters::style::FontFamily::SansSerif, 24))
+        .set_label_area_size(LabelAreaPosition::Left, left_label_width_px)
         .set_label_area_size(LabelAreaPosition::Bottom, 56)
-        .build_cartesian_2d(x_min..x_max, min_val..max_val)
+        .build_cartesian_2d(x_min..x_max, (min_val / yscale)..(max_val / yscale))
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    // Axis label formatters: integers with locale thousands separators
-    let y_label_fmt = |v: &f64| {
-        let n = (*v).round() as i64;
-        n.to_formatted_string(num_locale)
-    };
+    // X ticks (years) stay as integers with locale-aware thousands
     let x_label_fmt = |x: &f64| (x.round() as i32).to_string();
-
     let x_label_count = ((max_year - min_year + 1) as usize).min(12);
+
+    // Y ticks: now show short decimals **after scaling** and put the unit in the axis label.
+    let y_label_fmt_scaled = |v: &f64| {
+        let a = v.abs();
+        let prec = if a >= 100.0 {
+            0
+        } else if a >= 10.0 {
+            1
+        } else {
+            2
+        };
+        format!("{:.*}", prec, *v) // small values → a couple decimals; big → none
+    };
     let y_label_count = 10usize;
 
     chart
         .configure_mesh()
         .x_desc("Year")
-        .y_desc("Value")
+        .y_desc(if unit_label.is_empty() {
+            "Value".to_string()
+        } else {
+            format!("Value ({})", unit_label)
+        })
         .x_labels(x_label_count)
         .y_labels(y_label_count)
         .x_label_formatter(&x_label_fmt)
-        .y_label_formatter(&y_label_fmt)
-        .label_style((FontFamily::SansSerif, 12))
-        .axis_desc_style((FontFamily::SansSerif, 16))
+        .y_label_formatter(&y_label_fmt_scaled)
+        .label_style((plotters::style::FontFamily::SansSerif, 12))
+        .axis_desc_style((plotters::style::FontFamily::SansSerif, 16))
         .draw()
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
     // Build name lookups for long legend labels
+    use std::collections::HashMap;
     let mut indicator_name_by_id: HashMap<String, String> = HashMap::new();
     let mut country_name_by_iso3: HashMap<String, String> = HashMap::new();
     for p in points {
@@ -565,6 +739,7 @@ where
     }
 
     // Group as (ISO3, indicator_id) -> Vec<(year, value)>
+    use std::collections::BTreeMap;
     let mut groups: BTreeMap<(String, String), Vec<(i32, f64)>> = BTreeMap::new();
     for p in points {
         if let (y, Some(v)) = (p.year, p.value)
@@ -584,7 +759,7 @@ where
     let mut legend_items: Vec<(String, RGBAColor)> = Vec::new();
     let inside_mode = matches!(legend, LegendMode::Inside);
 
-    // Distinct behaviors by plot kind
+    // Distinct behaviors by plot kind; **Y values scaled by `yscale`** when plotting
     match kind {
         PlotKind::Line
         | PlotKind::Scatter
@@ -603,9 +778,11 @@ where
                     .unwrap_or_else(|| indicator_id.clone());
                 let legend_label = format!("{} — {}", country_label, indicator_label);
 
-                // Convert to f64 X to draw on float axis
-                let series_f: Vec<(f64, f64)> =
-                    series.iter().map(|(x, y)| (*x as f64, *y)).collect();
+                // Convert to f64 X and **scale Y**
+                let series_f: Vec<(f64, f64)> = series
+                    .iter()
+                    .map(|(x, y)| (*x as f64, *y / yscale))
+                    .collect();
 
                 match kind {
                     PlotKind::Line => {
@@ -626,7 +803,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        (FontFamily::SansSerif, 14),
+                                        (plotters::style::FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -650,7 +827,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        (FontFamily::SansSerif, 14),
+                                        (plotters::style::FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -682,7 +859,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        (FontFamily::SansSerif, 14),
+                                        (plotters::style::FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -690,12 +867,13 @@ where
                         }
                     }
                     PlotKind::Area => {
-                        let baseline = 0.0f64.min(min_val);
+                        // Baseline scaled accordingly
+                        let baseline_scaled = 0.0f64.min(min_val) / yscale;
                         let fill = color.clone().mix(0.20).filled();
                         let border = color.clone().stroke_width(1);
                         let elem = chart
                             .draw_series(
-                                AreaSeries::new(series_f.clone(), baseline, fill)
+                                AreaSeries::new(series_f.clone(), baseline_scaled, fill)
                                     .border_style(border),
                             )
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
@@ -708,7 +886,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        (FontFamily::SansSerif, 14),
+                                        (plotters::style::FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -716,11 +894,14 @@ where
                         }
                     }
                     PlotKind::Loess => {
-                        let xs: Vec<f64> = series_f.iter().map(|(x, _)| *x).collect();
-                        let ys: Vec<f64> = series_f.iter().map(|(_, y)| *y).collect();
+                        // Smooth on original values, then **scale** the result for plotting
+                        let xs: Vec<f64> = series.iter().map(|(x, _)| *x as f64).collect();
+                        let ys: Vec<f64> = series.iter().map(|(_, y)| *y).collect();
                         let yhat = loess_series(&xs, &ys, loess_span);
-                        let smoothed: Vec<(f64, f64)> =
-                            xs.into_iter().zip(yhat.into_iter()).collect();
+                        let smoothed: Vec<(f64, f64)> = xs
+                            .into_iter()
+                            .zip(yhat.into_iter().map(|v| v / yscale))
+                            .collect();
                         let style = ShapeStyle {
                             color,
                             filled: false,
@@ -739,7 +920,7 @@ where
                                     + Text::new(
                                         legend_text.clone(),
                                         (x + 20, y),
-                                        (FontFamily::SansSerif, 14),
+                                        (plotters::style::FontFamily::SansSerif, 14),
                                     )
                             });
                         } else {
@@ -756,11 +937,9 @@ where
         PlotKind::StackedArea => {
             // Build a union of years
             let years_all: Vec<i32> = (min_year..=max_year).collect();
-            // Prepare cumulative stacks
+            // Cumulative positive stacks per year (unscaled); we'll scale at draw time.
             let mut cum: Vec<f64> = vec![0.0; years_all.len()];
-            for (idx, ((_country_iso3, _indicator_id), _)) in groups.iter().enumerate() {
-                let _ = idx; // to compute colors in second loop
-            }
+
             // To keep legend order consistent, iterate groups in order
             for (idx, ((country_iso3, indicator_id), series)) in groups.iter().enumerate() {
                 let color = office_color(idx);
@@ -781,7 +960,8 @@ where
                         vals[(*y - min_year) as usize] = (*v).max(0.0); // stack positive part
                     }
                 }
-                // Build upper curve by adding to cumulative
+
+                // Build upper & lower in **unscaled** units then scale when drawing
                 let mut upper: Vec<(f64, f64)> = Vec::with_capacity(vals.len());
                 let mut lower: Vec<(f64, f64)> = Vec::with_capacity(vals.len());
                 for (i, v) in vals.iter().enumerate() {
@@ -790,23 +970,28 @@ where
                     cum[i] += *v;
                     upper.push((x, cum[i]));
                 }
-                // Create polygon points: lower (forward) + upper (reverse)
+
+                // Create polygon points: lower (forward) + upper (reverse), **scaled**
                 let mut poly: Vec<(f64, f64)> = Vec::with_capacity(upper.len() * 2);
-                poly.extend(lower.iter().cloned());
-                poly.extend(upper.iter().rev().cloned());
+                poly.extend(lower.iter().map(|(x, y)| (*x, *y / yscale)));
+                poly.extend(upper.iter().rev().map(|(x, y)| (*x, *y / yscale)));
 
                 let fill = color.clone().mix(0.30).filled();
                 let border = color.clone().stroke_width(1);
-                // Use an AreaSeries from lower baseline; emulate by drawing polygon
                 chart
                     .draw_series(std::iter::once(Polygon::new(poly, fill)))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 chart
-                    .draw_series(std::iter::once(PathElement::new(upper.clone(), border)))
+                    .draw_series(std::iter::once(PathElement::new(
+                        upper
+                            .iter()
+                            .map(|(x, y)| (*x, *y / yscale))
+                            .collect::<Vec<_>>(),
+                        border,
+                    )))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
                 if inside_mode {
-                    // Collect, then render with built-in
                     legend_items.push((legend_label, color));
                 } else {
                     legend_items.push((legend_label, color));
@@ -834,8 +1019,9 @@ where
                     let x_center = *y as f64;
                     let x0 = x_center - group_width / 2.0 + idx as f64 * bar_w;
                     let x1 = x0 + bar_w;
-                    let y0 = 0.0f64.min(*v);
-                    let y1 = 0.0f64.max(*v);
+                    // **Scale** bar heights
+                    let y0 = 0.0f64.min(*v) / yscale;
+                    let y1 = 0.0f64.max(*v) / yscale;
                     let rect = Rectangle::new([(x0, y0), (x1, y1)], color.clone().filled());
                     chart
                         .draw_series(std::iter::once(rect))
@@ -853,7 +1039,7 @@ where
             .border_style(BLACK)
             .position(SeriesLabelPosition::UpperLeft)
             .background_style(WHITE.mix(0.85))
-            .label_font((FontFamily::SansSerif, 14))
+            .label_font((plotters::style::FontFamily::SansSerif, 14))
             .draw()
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     } else if let Some(ref legend_area) = legend_area_opt {
