@@ -13,7 +13,7 @@ categories = [
     "command-line-utilities",
     "science",
     "visualization",
-    "data-format",
+    "mathematics",
     "multimedia::images",
 ]
 keywords = ["data", "science", "visualization", "plotting", "worldbank"]
