@@ -16,7 +16,7 @@ categories = [
     "data-format",
     "multimedia::images",
 ]
-keywords = ["data", "science", "visualization", "plotting", "world bank"]
+keywords = ["data", "science", "visualization", "plotting", "worldbank"]
 
 [lib]
 name = "world_bank_data_rust"
