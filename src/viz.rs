@@ -1000,76 +1000,15 @@ where
     let title_font_px: u32 = 16;
     let font_px: u32 = 14;
 
-    // Inline estimator (closure) to avoid missing-symbol issues:
-    let estimate_top_bottom_legend_height_px = |labels: &[String],
-                                                start_x: i32,
-                                                total_w: i32,
-                                                has_title: bool,
-                                                title_font_px: u32,
-                                                font_px: u32|
-     -> i32 {
-        // Must mirror draw_legend_panel metrics
-        let line_h: i32 = font_px as i32 + 4;
-        let row_gap: i32 = 6;
-        let pad_small: i32 = 6;
-        let pad_band: i32 = 8;
-        let marker_radius: i32 = 4;
-        let marker_to_text_gap: i32 = 12;
-        let trailing_gap: i32 = 12;
-
-        let mut height = if has_title {
-            pad_band + title_font_px as i32 + 8
-        } else {
-            pad_band + 8
-        };
-
-        let usable_row_w = total_w - pad_small;
-        let mut x = start_x;
-        let mut row_h: i32 = line_h;
-
-        let text_max_fresh = (usable_row_w - start_x)
-            .max(40)
-            .saturating_sub((marker_to_text_gap + marker_radius + trailing_gap) as i32)
-            as u32;
-
-        for label in labels {
-            let full_text_w = estimate_text_width_px(label, font_px) as i32;
-            let mut block_w = marker_to_text_gap + marker_radius + full_text_w + trailing_gap;
-            let mut block_h = line_h;
-
-            if block_w > (usable_row_w - start_x) {
-                let lines = wrap_text_to_width(label, font_px, text_max_fresh);
-                let max_line_w = lines
-                    .iter()
-                    .map(|s| estimate_text_width_px(s, font_px) as i32)
-                    .max()
-                    .unwrap_or(0);
-                block_w = marker_to_text_gap + marker_radius + max_line_w + trailing_gap;
-                block_h = (lines.len().max(1) as i32) * line_h;
-            }
-
-            if x + block_w > usable_row_w {
-                height += row_h + row_gap;
-                x = start_x;
-                row_h = block_h;
-            } else {
-                row_h = row_h.max(block_h);
-            }
-            x += block_w;
-        }
-
-        height += row_h + pad_band;
-        height.clamp(40, (total_w * 2) / 3)
-    };
-
+    // Estimator to avoid missing-symbol issues:
     let legend_needed_h = if matches!(legend, LegendMode::Top | LegendMode::Bottom) {
         estimate_top_bottom_legend_height_px(
             &legend_texts,
             axis_x_start_px,
             root_w,
-            has_title,
-            title_font_px,
-            font_px,
+            /* has_title: */ false, // we render without a legend title by default
+            /* title_font_px: */ 16,
+            /* font_px: */ 14,
         )
     } else {
         0
