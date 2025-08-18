@@ -24,7 +24,9 @@
 /// ```
 use crate::models::{DataPoint, DateSpec, Entry, Meta};
 use anyhow::{Context, Result, bail};
+use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
 use reqwest::blocking::Client as HttpClient;
+use reqwest::redirect::Policy;
 use serde_json::Value;
 use std::time::Duration;
 
@@ -68,7 +70,10 @@ pub struct Client {
 impl Default for Client {
     fn default() -> Self {
         let http = HttpClient::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(30)) // total request timeout
+            .connect_timeout(Duration::from_secs(10)) // connect timeout
+            .redirect(Policy::limited(5)) // cap redirects
+            .user_agent(concat!("world_bank_data_rust/", env!("CARGO_PKG_VERSION"))) // set user agent
             .build()
             .expect("reqwest client build");
         Self {
@@ -76,6 +81,17 @@ impl Default for Client {
             http,
         }
     }
+}
+
+// Allow -, _, . unescaped in codes (common for indicator ids)
+const SAFE: &AsciiSet = &NON_ALPHANUMERIC.remove(b'-').remove(b'_').remove(b'.');
+
+fn enc_join<'a>(parts: impl IntoIterator<Item = &'a str>) -> String {
+    parts
+        .into_iter()
+        .map(|s| percent_encoding::utf8_percent_encode(s.trim(), SAFE).to_string())
+        .collect::<Vec<_>>()
+        .join(";")
 }
 
 impl Client {
@@ -99,8 +115,8 @@ impl Client {
             bail!("at least one indicator code required");
         }
 
-        let country_spec = countries.join(";");
-        let indicator_spec = indicators.join(";");
+        let country_spec = enc_join(countries.iter().map(|s| s.as_str()));
+        let indicator_spec = enc_join(indicators.iter().map(|s| s.as_str()));
 
         let mut url = format!(
             "{}/country/{}/indicator/{}?format=json&per_page=1000",
@@ -113,20 +129,35 @@ impl Client {
             url.push_str(&format!("&source={}", s));
         }
 
+        // Small retry for transient failures (5xx / network errors)
+        let get_json = |u: &str| -> Result<Value> {
+            let mut last_err: Option<anyhow::Error> = None;
+            for backoff_ms in [100u64, 300, 700] {
+                match self.http.get(u).send() {
+                    Ok(r) if r.status().is_success() => {
+                        return Ok(r.json().context("decode json")?);
+                    }
+                    Ok(r) if r.status().is_server_error() => { /* retry */ }
+                    Ok(r) => bail!("request failed with HTTP {}", r.status()),
+                    Err(e) => last_err = Some(e.into()),
+                }
+                std::thread::sleep(Duration::from_millis(backoff_ms));
+            }
+            bail!("network error: {:?}", last_err);
+        };
+
+        // Safety cap to avoid pathological jobs
+        let max_pages = 1000u32;
+
         // Paginate until we retrieved all pages.
         let mut page = 1u32;
         let mut out: Vec<DataPoint> = Vec::new();
         loop {
             let page_url = format!("{}&page={}", url, page);
-            let resp = self
-                .http
-                .get(&page_url)
-                .send()
-                .with_context(|| format!("GET {}", page_url))?;
-            if !resp.status().is_success() {
-                bail!("request failed with HTTP {}", resp.status());
+            if page > max_pages {
+                bail!("page limit exceeded ({})", max_pages);
             }
-            let v: Value = resp.json().context("decode json")?;
+            let v: Value = get_json(&page_url).with_context(|| format!("GET {}", page_url))?;
 
             // The API returns an array: [Meta, [Entry, ...]] or a "message" object in position 0 on error.
             let arr = v.as_array().ok_or_else(|| {

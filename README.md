@@ -1,268 +1,333 @@
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-1.75%2B-orange.svg)](#)
+
 # World Bank Data Rust 🦀📊📈
 
 <p align="center">
   <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="enc_file Logo" width="200"/>
 </p>
 
-A Rust **library + CLI** to fetch, store, visualize, and summarize [World Bank](https://datahelpdesk.worldbank.org/knowledgebase/topics/125589-developer-information) indicator data.
+Fetch, analyze, and visualize World Bank data from Rust.  
+This project provides both a **CLI** and a **library API** to retrieve time series from the World Bank API, export them safely (CSV/JSON), compute grouped statistics, and render charts (SVG/PNG) with Plotters.
 
-- **Library**: typed API client, tidy data model, summary stats, flexible plotting
-- **CLI**: one-liners to fetch → save/plot → print summaries
+> Status: actively developed. Library API is stable enough for use; updates follow semantic versioning.
+
+---
+
+## Table of contents
+
+- [Features](#features)
+- [Install](#install)
+- [Quick start (CLI)](#quick-start-cli)
+- [CLI usage](#cli-usage)
+  - [Format inference for `--out`](#format-inference-for---out)
+  - [Examples](#examples)
+- [Library usage](#library-usage)
+  - [Add to `Cargo.toml`](#add-to-cargotoml)
+  - [Fetch data](#fetch-data)
+  - [Export data (atomic CSV/JSON)](#export-data-atomic-csvjson)
+  - [Compute grouped summaries](#compute-grouped-summaries)
+  - [Plot charts](#plot-charts)
+  - [Data model](#data-model)
+- [Data formats](#data-formats)
+- [Security & reliability](#security--reliability)
+- [Testing](#testing)
+- [CI setup (example)](#ci-setup-example)
+- [Contributing](#contributing)
+- [Changelog (recent)](#changelog-recent)
+- [License](#license)
+
+---
+
+## Features
+
+### What it can do
+
+- **Retrieve data** from the World Bank by country/countries, indicator(s), and optional date range.
+- **Show short stats in the terminal** (grouped min / max / mean / median per (indicator, country)).
+- **Export datasets** to **CSV** or **JSON** (format inferred from `--out` extension or set via `--format`).  
+  Exports are **atomic** and CSV is **spreadsheet-safe**.
+- **Export plots** as **SVG** or **PNG** (backend inferred from `--plot` file extension).
+
+### Under the hood
+
+- **Hardened HTTPS client** (connect/request timeouts, limited redirects, descriptive `User-Agent`).
+- **Robust URL handling** (percent-encoded path segments for user inputs).
+- **Transient error resilience** (small retry/backoff) and **page caps**.
+- **Valid JSON** under all inputs (`NaN`/`±∞` → `null`).
+- **Numerical stability** (non-finite values treated as missing; safe float sorting).
+- **Portable plotting** with an embedded TTF font for CI/headless environments.
+
+---
 
 ## Install
 
+Download a prebuilt binary (GitHub Releases):
+
+1) Go to **GitHub → Releases**: [https://github.com/ArdentEmpiricist/world_bank_data_rust/releases/new](https://github.com/ArdentEmpiricist/world_bank_data_rust/releases/new)
+2) Download the asset for your platform
+
+Via cargo/crates.io:
+
 ```bash
-# From source (inside the project folder)
-cargo install --path .
+cargo install world_bank_data_rust
+world_bank_data_rust --help
+```
+
+From source:
+
+```bash
+git clone <this-repo>
+cd world_bank_data_rust
+cargo build --release
+```
+
+As a library (example):
+
+```toml
+[dependencies]
+world_bank_data_rust = { path = "." } # replace with git or registry when published
+anyhow = "1"
 ```
 
 ---
 
-## Quickstart
+## Quick start (CLI)
+
+Fetch population for Germany & France (2000–2023) and write to CSV (format inferred from extension):
 
 ```bash
 world_bank_data_rust get \
-  --countries DEU,USA \
+  --countries DEU;FRA \
   --indicators SP.POP.TOTL \
-  --date 2010:2020 \
-  --out pop.csv --format csv \
-  --plot pop.svg \
-  --stats \
-  --locale de
+  --date 2000:2023 \
+  --out pop.csv
 ```
 
-- Saves tidy CSV to `pop.csv`
-- Creates a chart at `pop.svg`
-- Prints grouped stats to stdout with **German** number formatting
-
----
-
-## Full CLI Reference
-
-### Command
-
-```
-world_bank_data_rust get [OPTIONS]
-```
-
-### Required
-
-| Flag | Type | Description |
-|---|---|---|
-| `-c, --countries` | string | Comma/semicolon-separated country/region codes. Examples: `DEU,USA`, `EUU`. |
-| `-i, --indicators` | string | Comma/semicolon-separated indicator codes. Example: `SP.POP.TOTL`. |
-
-### Optional
-
-| Flag | Type | Default | Description |
-|---|---|---:|---|
-| `-d, --date` | `YYYY` or `YYYY:YYYY` | — | Single year or inclusive range. Example: `2010:2020`. |
-| `--source` | integer | — | Indicator source id (e.g., `2` for WDI). Required by API **when querying multiple indicators**. |
-| `--out` | path | — | Save results to file. Use with `--format` or let extension infer format. |
-| `--format` | enum `csv,json` | — | Output format for `--out`. |
-| `--plot` | path | — | Create a chart at the given path (`.svg` or `.png`). |
-| `--width` | integer | `1000` | Chart width (pixels). |
-| `--height` | integer | `600` | Chart height (pixels). |
-| `--title` | string | `"World Bank Indicator(s)"` | Chart title. |
-| `--stats` | flag | `false` | Print grouped summary stats to stdout. |
-| `--locale` | string | `"en"` | Number formatting for chart labels & stats. Supports `en,de,fr,es,it,pt,nl,…`. |
-| `--legend` | enum `inside,right,top,bottom` | `right` | Where the legend is rendered. `inside` overlays the plot; others avoid overlap. |
-| `--plot-kind` | enum `line,scatter,line-points,area,stacked-area,grouped-bar,loess` | `line` | Chart type (see examples below). |
-| `--loess-span` | float in `(0,1]` | `0.3` | Smoothing span for `--plot-kind loess`. Ignored for other kinds. |
-
-### Notes
-
-- `--plot` supports **SVG** and **PNG** based on the file extension.
-- For **multiple indicators** in a single request, the World Bank API requires a `--source` id (commonly `2` for WDI).
-- Legends: `right`/`top`/`bottom` render outside the plot to avoid overlap; long labels wrap/truncate as needed; markers are centered with text.
-- Colors follow the **Microsoft Office palette** (Blue, Orange, Gray, Gold, Light Blue, Green, …).
-
----
-
-## Examples
-
-### 1) Fetch & Save
-
-**CSV**
+Render a plot (backend inferred from extension):
 
 ```bash
 world_bank_data_rust get \
-  --countries DEU,USA \
+  --countries DEU;FRA \
   --indicators SP.POP.TOTL \
-  --date 2010:2020 \
-  --out pop.csv --format csv
-```
-
-**JSON (format via extension)**
-
-```bash
-world_bank_data_rust get \
-  --countries DEU \
-  --indicators SP.POP.TOTL \
-  --date 2019 \
-  --out pop.json
-```
-
-### 2) Basic Plots
-
-**Line (default)**
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
-  --plot pop.svg --legend right
-```
-
-**Scatter**
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
-  --plot pop_scatter.svg --legend top \
-  --plot-kind scatter
-```
-
-**Line + Points**
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
-  --plot pop_lp.svg --legend bottom \
-  --plot-kind line-points
-```
-
-**Area**
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA -i SP.POP.TOTL -d 2010:2020 \
-  --plot pop_area.svg --legend right \
-  --plot-kind area
-```
-
-### 3) Advanced Plots
-
-**Stacked Area** (stacks **positive** contributions per year)
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA \
-  -i SP.POP.TOTL \
-  -d 2010:2020 \
-  --plot pop_stacked.svg \
-  --legend bottom \
-  --plot-kind stacked-area
-```
-
-**Grouped Bar** (bars offset within each year)
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA \
-  -i SP.POP.TOTL \
-  -d 2010:2020 \
-  --plot pop_bars.svg \
-  --legend top \
-  --plot-kind grouped-bar
-```
-
-**LOESS Smoothing** (local regression; `span` controls smoothness)
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA \
-  -i SP.POP.TOTL \
-  -d 1960:2020 \
-  --plot pop_loess.svg \
-  --legend right \
-  --plot-kind loess \
-  --loess-span 0.25
-```
-
-### 4) International Formatting & Titles
-
-**German formatting + custom title**
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA \
-  -i SP.POP.TOTL \
-  -d 2010:2020 \
-  --plot pop_de.svg \
-  --legend right \
-  --locale de \
-  --title "Bevölkerung gesamt (2010–2020)"
-```
-
-**PNG output**
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA \
-  -i SP.POP.TOTL \
-  -d 2010:2020 \
-  --plot pop.png \
-  --legend right
-```
-
-### 5) Stats in the Terminal
-
-```bash
-world_bank_data_rust get \
-  -c DEU,USA \
-  -i SP.POP.TOTL \
-  -d 2010:2020 \
-  --stats --locale en
-```
-
-Output looks like:
-
-```
-DEU • SP.POP.TOTL  count=11 missing=0  min=80,274,983 max=83,160,871 mean=81,814,340 median=81,776,930
-USA • SP.POP.TOTL  count=11 missing=0  min=...       max=...       mean=...       median=...
+  --date 2000:2023 \
+  --plot pop.svg
 ```
 
 ---
 
-## Library Highlights (Rust)
+## CLI usage
+
+Subcommand `get` accepts at least:
+
+- `--countries` ISO2/ISO3 codes separated by `;` or `,` (e.g., `DEU;FRA`)
+- `--indicators` World Bank indicator IDs (e.g., `SP.POP.TOTL`)
+- `--date` optional year or range (e.g., `2020` or `2000:2023`)
+- `--out <PATH>` optional export (CSV/JSON); **atomic**
+- `--plot <PATH>` optional chart output (SVG/PNG), using Plotters
+
+### Format inference for `--out`
+
+- If `--format` is **not** provided, the format is **inferred**:
+  - `.csv` → CSV
+  - `.json` → JSON
+  - no extension → defaults to CSV
+  - unknown extension (with no `--format`) → error
+- If `--format` **is** provided:
+  - It must **match** known extensions; conflicting combinations (e.g., `--out data.csv --format json`) **error** early
+  - For unknown extensions, the explicit format wins
+
+### Examples
+
+```bash
+# CSV via extension inference
+world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.csv
+
+# JSON via extension inference
+world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.json
+
+# Unknown extension allowed when --format is explicit
+world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out dump.xyz --format csv
+
+# Error on conflict
+world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.csv --format json
+```
+
+---
+
+## Library usage
+
+The crate exposes modules for API access, models, storage, statistics, and plotting.
+
+### Add to `Cargo.toml`
+
+```toml
+[dependencies]
+world_bank_data_rust = { path = "." } # change to your source
+anyhow = "1"
+```
+
+### Fetch data
 
 ```rust
-use world_bank_data_rust::{Client, DateSpec};
-use world_bank_data_rust::viz::{self, LegendMode, PlotKind};
+use anyhow::Result;
+use world_bank_data_rust::api::Client;
+use world_bank_data_rust::models::DateSpec;
 
-let client = Client::default();
-let data = client.fetch(
-    &["DEU".into(), "USA".into()],
-    &["SP.POP.TOTL".into()],
-    Some(DateSpec::Range{ start: 2010, end: 2020 }),
-    None,
-)?;
+fn main() -> Result<()> {
+    // Hardened blocking client (rustls, timeouts, redirect policy, UA)
+    let api = Client::default();
 
-// Save
-world_bank_data_rust::storage::save_csv(&data, "pop.csv")?;
+    // Countries & indicators can be given as lists; date is optional
+    let points = api.fetch(
+        &["DEU".into(), "FRA".into()],
+        &["SP.POP.TOTL".into()],
+        Some(DateSpec::Range { start: 2000, end: 2023 }),
+        None, // source id
+    )?;
 
-// Plot (scatter, German labels)
-viz::plot_chart(&data, "pop.svg", 1000, 600, "de", LegendMode::Top, "Population (2010–2020)", PlotKind::Scatter, 0.3)?;
-
-// Summaries
-let summaries = world_bank_data_rust::stats::grouped_summary(&data);
-for s in summaries {
-    println!("{:?}", s);
+    println!("rows: {}", points.len());
+    Ok(())
 }
-# Ok::<(), anyhow::Error>(())
+```
+
+### Export data (atomic CSV/JSON)
+
+```rust
+use world_bank_data_rust::storage::{save_csv, save_json};
+
+save_csv(&points, "pop.csv")?;   // spreadsheet-safe + atomic
+save_json(&points, "pop.json")?; // non-finite -> null + atomic
+```
+
+- **CSV**: fixed header order; cells beginning with `=`, `+`, `-`, `@` are prefixed with `'`.
+- **JSON**: pretty-printed; non-finite floats are serialized as `null`.
+
+Both writers use a tempfile in the destination directory and atomically replace the target file.
+
+### Compute grouped summaries
+
+```rust
+use world_bank_data_rust::stats::{grouped_summary, Summary};
+
+let summaries: Vec<Summary> = grouped_summary(&points);
+// Summary contains: key (indicator_id, country_iso3), count, missing, min, max, mean, median.
+// Non-finite values are counted as missing; sorting avoids panics on floats.
+```
+
+### Plot charts
+
+```rust
+use world_bank_data_rust::viz::plot_chart;
+
+// `plot_chart` filters non-finite values and sorts by integer year.
+// The backend is selected from the output extension (.svg, .png).
+plot_chart(&points, "pop.svg")?;
+```
+
+### Data model
+
+```rust
+// Simplified view
+pub struct DataPoint {
+    pub indicator_id: String,
+    pub indicator_name: String,
+    pub country_id: String,
+    pub country_name: String,
+    pub country_iso3: String,
+    pub year: i32,
+    pub value: Option<f64>,   // may be None for missing
+    pub unit: Option<String>,
+    pub obs_status: Option<String>,
+    pub decimal: Option<i64>,
+}
 ```
 
 ---
 
-## Tips & Notes
+## Data formats
 
-- **Legends:** Use `--legend top` / `bottom` for long labels (they wrap over multiple rows). `--legend right` truncates long labels to fit the panel.
-- **Inside legend:** `--legend inside` overlays the plot and can overlap lines; keep for quick previews.
-- **Multiple indicators:** Pass `--source 2` (WDI) when using multiple indicator codes; otherwise the API may error.
-- **Colors:** Series colors follow the Microsoft Office palette (Blue, Orange, Gray, Gold, Light Blue, Green, …).
-- **Axes:** Y-axis shows whole numbers with locale-specific thousands separators.
+### CSV
+
+- **Header:** `indicator_id, indicator_name, country_id, country_name, country_iso3, year, value, unit, obs_status, decimal`
+- **Quoting/escaping:** handled by the `csv` crate (RFC-4180)
+- **Missing values:** `None` → empty cell
+- **Safety:** cells beginning with `=`, `+`, `-`, `@` are prefixed with `'` (prevents formula execution)
+
+### JSON
+
+- **Shape:** array of objects mirroring the CSV fields
+- **Numbers:** non-finite floats serialized as `null`
+- **Formatting:** pretty-printed for readability
+
+---
+
+## Security & reliability
+
+- **Networking**
+  - TLS via `rustls`
+  - Request + connect timeouts, limited redirects
+  - Descriptive `User-Agent`
+  - Percent-encoding for user-supplied path segments
+  - Small retry/backoff on transient failures
+  - Hard cap on pages to avoid runaway jobs
+- **Exports**
+  - **Atomic writes** for CSV/JSON
+  - **CSV formula guard**
+  - **Valid JSON** under all numeric inputs
+- **Numerics**
+  - Non-finite values filtered/treated as missing
+  - Safe sorting; integer year ordering for plots
+- **Rendering**
+  - Embedded font registration avoids “FontUnavailable” in headless/CI
+
+---
+
+## Testing
+
+Run all tests:
+
+```bash
+# use without --feature online to test local only
+cargo test --features online
+```
+
+Coverage includes:
+
+- CSV formula guard (prefix `'`)
+- Output format logic in `cmd_get` (inference, explicit flags, conflicts)
+- Basic numeric guards (non-finite handling)
+
+---
+
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. **Discuss major changes first**: open an issue to align on scope/design before large features or public API changes.
+2. **Keep PRs focused**: small, single-purpose PRs are easier to review and merge.
+3. **Code quality**: ensure all of the following pass locally or supply arguments why some parts do not pass:
+
+   ```bash
+   cargo fmt --all
+   cargo clippy --all-targets --all-features -- -D warnings
+   cargo test --all -- --nocapture
+   ```
+
+4. **Commit messages**: using [Conventional Commits](https://www.conventionalcommits.org/) is appreciated (e.g., `feat:`, `fix:`, `docs:`).
+5. **License**: by contributing, you agree your changes are dual MIT and Apache-2.-licensed.
+
+---
 
 ## License
 
-Dual-licensed under either **MIT** or **Apache-2.0**.
+Licensed under either of
+
+- [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0.txt)
+- [MIT license](LICENSE)
+
+at your option.
+
+Any contribution intentionally submitted for inclusion in this work shall be
+dual licensed as above, without any additional terms or conditions.
