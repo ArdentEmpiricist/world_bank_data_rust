@@ -1,9 +1,3 @@
-use crate::models::{DataPoint, DateSpec, Entry, Meta};
-use anyhow::{Context, Result, bail};
-use reqwest::blocking::Client as HttpClient;
-use serde_json::Value;
-use std::time::Duration;
-
 /// Synchronous client for the **World Bank Indicators API (v2)**.
 ///
 /// This module focuses on the `country/{codes}/indicator/{codes}` endpoint and returns
@@ -28,6 +22,11 @@ use std::time::Duration;
 /// )?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
+use crate::models::{DataPoint, DateSpec, Entry, Meta};
+use anyhow::{Context, Result, bail};
+use reqwest::blocking::Client as HttpClient;
+use serde_json::Value;
+use std::time::Duration;
 
 /// Fetch indicator observations.
 ///

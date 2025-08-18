@@ -10,10 +10,12 @@
 /// - `Inside`: overlay inside the plot (may overlap data)
 /// - `Right`: separate right-side panel (no overlap)
 /// - `Top`/`Bottom`: separate bands that wrap long labels
+///
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// pub enum LegendMode {/* … */}
 ///
 /// Which chart to render.
+///
 /// - `Line`: polyline per series
 /// - `Scatter`: markers only
 /// - `LinePoints`: line + markers
@@ -21,6 +23,7 @@
 /// - `StackedArea`: positive stacking by year across series
 /// - `GroupedBar`: per-year grouped bars (one per series)
 /// - `Loess`: locally weighted regression (span controls smoothness)
+///
 /// #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// pub enum PlotKind {/* … */}
 ///
@@ -288,7 +291,7 @@ pub fn plot_chart<P: AsRef<Path>>(
         values.iter().cloned().fold(f64::INFINITY, f64::min),
         values.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
     );
-    if (max_val - min_val).abs() < std::f64::EPSILON {
+    if (max_val - min_val).abs() < f64::EPSILON {
         min_val -= 1.0;
         max_val += 1.0;
     }
@@ -607,7 +610,7 @@ where
                 match kind {
                     PlotKind::Line => {
                         let style = ShapeStyle {
-                            color: color,
+                            color,
                             filled: false,
                             stroke_width: 2,
                         };
@@ -656,7 +659,7 @@ where
                     }
                     PlotKind::LinePoints => {
                         let style = ShapeStyle {
-                            color: color,
+                            color,
                             filled: false,
                             stroke_width: 2,
                         };
@@ -719,7 +722,7 @@ where
                         let smoothed: Vec<(f64, f64)> =
                             xs.into_iter().zip(yhat.into_iter()).collect();
                         let style = ShapeStyle {
-                            color: color,
+                            color,
                             filled: false,
                             stroke_width: 3,
                         };
@@ -839,11 +842,7 @@ where
                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 }
 
-                if inside_mode {
-                    legend_items.push((legend_label, color));
-                } else {
-                    legend_items.push((legend_label, color));
-                }
+                legend_items.push((legend_label, color));
             }
         }
     }

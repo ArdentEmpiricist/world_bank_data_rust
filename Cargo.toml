@@ -53,6 +53,7 @@ plotters-svg = "0.3.7"
 chrono = { version = "0.4", features = ["serde"] }
 regex = "1"
 num-format = "0.4"
+tempfile = "3"
 
 [dev-dependencies]
 assert_cmd = "2"

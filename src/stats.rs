@@ -1,6 +1,5 @@
 use crate::models::{DataPoint, GroupKey};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 /// Simple grouped summary statistics.
 ///
@@ -46,31 +45,49 @@ pub struct Summary {
 }
 
 /// Compute grouped statistics by (indicator_id, country_iso3).
+/// This function aggregates `DataPoint` entries into summaries.
+/// With finite-value guard + safe sort
 pub fn grouped_summary(points: &[DataPoint]) -> Vec<Summary> {
+    use std::cmp::Ordering;
+    use std::collections::BTreeMap;
+
     let mut groups: BTreeMap<GroupKey, Vec<f64>> = BTreeMap::new();
     let mut missing: BTreeMap<GroupKey, usize> = BTreeMap::new();
+
     for p in points {
         let key = GroupKey {
             indicator_id: p.indicator_id.clone(),
             country_iso3: p.country_iso3.clone(),
         };
+
         match p.value {
-            Some(v) => groups.entry(key).or_default().push(v),
-            None => *missing.entry(key).or_default() += 1,
+            // Treat only finite numbers as valid observations
+            Some(v) if v.is_finite() => {
+                groups.entry(key).or_default().push(v);
+            }
+            // Count None or non-finite values as "missing"
+            _ => {
+                *missing.entry(key).or_default() += 1;
+            }
         }
     }
 
     let mut out = Vec::new();
+
     for (key, mut vals) in groups {
-        vals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        // Safe float sort (no unwrap panic even if weird floats slipped through)
+        vals.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Ordering::Equal));
+
         let count = vals.len();
         let min = vals.first().cloned();
         let max = vals.last().cloned();
+
         let mean = if count > 0 {
             Some(vals.iter().copied().sum::<f64>() / count as f64)
         } else {
             None
         };
+
         let median = if count == 0 {
             None
         } else if count % 2 == 1 {
@@ -78,7 +95,9 @@ pub fn grouped_summary(points: &[DataPoint]) -> Vec<Summary> {
         } else {
             Some((vals[count / 2 - 1] + vals[count / 2]) / 2.0)
         };
+
         let miss = missing.get(&key).cloned().unwrap_or(0);
+
         out.push(Summary {
             key,
             count,
@@ -89,5 +108,6 @@ pub fn grouped_summary(points: &[DataPoint]) -> Vec<Summary> {
             median,
         });
     }
+
     out
 }
