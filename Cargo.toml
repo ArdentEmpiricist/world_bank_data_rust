@@ -51,7 +51,6 @@ plotters = { version = "0.3.7", default-features = false, features = [
     "point_series",
     "svg_backend",
 ] }
-
 # Bitmap backend with file output (`BitMapBackend::new`) via the `image` feature
 plotters-bitmap = { version = "0.3.7", features = ["image"] }
 plotters-svg = "0.3.7"
@@ -60,6 +59,7 @@ regex = "1.11"
 num-format = "0.4"
 tempfile = "3.20"
 percent-encoding = "2.3"
+ahash = "0.8.12"
 
 
 [dev-dependencies]
