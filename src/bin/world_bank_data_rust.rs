@@ -1,7 +1,7 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use num_format::{Locale, ToFormattedString};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use world_bank_data_rust::{Client, DateSpec};
 use world_bank_data_rust::{stats, storage, viz};
 
@@ -22,8 +22,8 @@ enum Command {
     Get(GetArgs),
 }
 
-#[derive(ValueEnum, Clone, Debug)]
-enum OutFormat {
+#[derive(Clone, Copy, Debug, clap::ValueEnum, PartialEq, Eq)]
+pub enum OutFormat {
     Csv,
     Json,
 }
@@ -162,6 +162,42 @@ fn fmt_opt_locale(v: Option<f64>, loc: &Locale, dec_sep: char) -> String {
     }
 }
 
+// Keep using your existing enum OutFormat { Csv, Json }.
+// No need for PartialEq; we use pattern matching.
+fn decide_output_format(path: &Path, format_flag: Option<OutFormat>) -> Result<&'static str> {
+    // If both a flag and an extension are present, ensure they don't conflict.
+    if let (Some(fmt_flag), Some(ext)) = (format_flag, path.extension().and_then(|e| e.to_str())) {
+        match (ext.to_ascii_lowercase().as_str(), fmt_flag) {
+            ("csv", OutFormat::Json) | ("json", OutFormat::Csv) => {
+                bail!(
+                    "Format conflict: --format {:?} but output extension '.{}'. \
+                     Align them or omit --format.",
+                    fmt_flag,
+                    ext
+                );
+            }
+            _ => {}
+        }
+    }
+
+    // Decide final format
+    let fmt = match (format_flag, path.extension().and_then(|e| e.to_str())) {
+        (Some(OutFormat::Csv), _) => "csv",
+        (Some(OutFormat::Json), _) => "json",
+        (None, Some(ext)) => match ext.to_ascii_lowercase().as_str() {
+            "csv" => "csv",
+            "json" => "json",
+            other => bail!(
+                "Unknown output extension '.{}'. Use .csv/.json or pass --format csv|json.",
+                other
+            ),
+        },
+        (None, None) => "csv", // default if no extension and no --format
+    };
+
+    Ok(fmt)
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd {
@@ -185,13 +221,8 @@ fn cmd_get(args: GetArgs) -> Result<()> {
     let points = client.fetch(&countries, &indicators, Some(date), args.source)?;
 
     if let Some(path) = args.out.as_ref() {
-        let fmt = match args.format {
-            Some(OutFormat::Csv) => "csv",
-            Some(OutFormat::Json) => "json",
-            None => path.extension().and_then(|e| e.to_str()).unwrap_or("csv"),
-        }
-        .to_ascii_lowercase();
-        match fmt.as_str() {
+        let fmt = decide_output_format(path, args.format)?;
+        match fmt {
             "csv" => storage::save_csv(&points, path)?,
             "json" => storage::save_json(&points, path)?,
             other => anyhow::bail!("unsupported format: {}", other),
@@ -260,5 +291,83 @@ fn parse_loess_span(s: &str) -> Result<f64, String> {
         Err("loess span must be in (0, 1]".into())
     } else {
         Ok(x)
+    }
+}
+
+#[cfg(test)]
+mod tests_out_format {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn ext_csv_no_flag_yields_csv() {
+        let p = PathBuf::from("pop.csv");
+        let got = decide_output_format(&p, None).expect("inference should succeed");
+        assert_eq!(got, "csv");
+    }
+
+    #[test]
+    fn ext_json_no_flag_yields_json() {
+        let p = PathBuf::from("pop.json");
+        let got = decide_output_format(&p, None).expect("inference should succeed");
+        assert_eq!(got, "json");
+    }
+
+    #[test]
+    fn no_ext_no_flag_defaults_to_csv() {
+        let p = PathBuf::from("pop");
+        let got = decide_output_format(&p, None).expect("default should be csv");
+        assert_eq!(got, "csv");
+    }
+
+    #[test]
+    fn matching_flag_and_ext_is_ok_csv() {
+        let p = PathBuf::from("data.csv");
+        let got = decide_output_format(&p, Some(OutFormat::Csv)).expect("should match");
+        assert_eq!(got, "csv");
+    }
+
+    #[test]
+    fn matching_flag_and_ext_is_ok_json() {
+        let p = PathBuf::from("data.json");
+        let got = decide_output_format(&p, Some(OutFormat::Json)).expect("should match");
+        assert_eq!(got, "json");
+    }
+
+    #[test]
+    fn conflict_between_flag_and_ext_errors() {
+        let p = PathBuf::from("data.csv");
+        let err = decide_output_format(&p, Some(OutFormat::Json)).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.to_lowercase().contains("conflict"),
+            "unexpected error msg: {msg}"
+        );
+    }
+
+    #[test]
+    fn unknown_ext_with_explicit_flag_is_allowed_and_uses_flag() {
+        let p = PathBuf::from("data.xyz");
+        let got =
+            decide_output_format(&p, Some(OutFormat::Csv)).expect("explicit format should win");
+        assert_eq!(got, "csv");
+    }
+
+    #[test]
+    fn unknown_ext_without_flag_errors() {
+        let p = PathBuf::from("data.xyz");
+        let err = decide_output_format(&p, None).unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.to_lowercase().contains("unknown output extension"),
+            "unexpected error msg: {msg}"
+        );
+    }
+
+    #[test]
+    fn uppercase_extension_is_supported() {
+        let p = PathBuf::from("DATA.CSV");
+        let got = decide_output_format(&p, None).expect("inference should succeed");
+        assert_eq!(got, "csv");
     }
 }
