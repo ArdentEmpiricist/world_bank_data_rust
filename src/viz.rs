@@ -305,36 +305,33 @@ fn wrap_text_to_width(text: &str, font_px: u32, max_px: u32) -> Vec<String> {
 ///   for LegendMode::Top | LegendMode::Bottom to avoid clipping or excessive whitespace.
 fn estimate_top_bottom_legend_height_px(
     labels: &[String],
-    start_x: i32, // where first text column should start (aligns to plot’s X-axis)
-    total_w: i32, // full canvas width in pixels
+    start_x: i32,
+    total_w: i32,
     has_title: bool,
     title_font_px: u32,
     font_px: u32,
 ) -> i32 {
-    // Constants MUST match draw_legend_panel()
-    let line_h: i32 = font_px as i32 + 2; // tighter line height (was +4)
-    let row_gap: i32 = 4; // smaller row gap (was 6)
+    // Must match draw_legend_panel()
+    let line_h: i32 = font_px as i32 + 2;
+    let row_gap: i32 = 4;
     let pad_small: i32 = 6;
     let pad_band: i32 = 8;
     let marker_radius: i32 = 4;
     let marker_to_text_gap: i32 = 12;
     let trailing_gap: i32 = 12;
 
-    // Initial vertical offset (title if present)
     let mut height = if has_title {
-        pad_band + title_font_px as i32 + 8 // title + gap
+        pad_band + title_font_px as i32 + 8
     } else {
         pad_band + 8
     };
 
     let usable_row_w = total_w - pad_small;
 
-    // Pass 1: Greedy pack into rows using a running x, to determine how many columns (K)
-    // and to get a first notion of rows (only the count of items per row matters here).
+    // Pass 1: greedy pack into rows to infer number of columns (K)
     let mut rows_item_counts: Vec<usize> = Vec::new();
     let mut x = start_x;
     let per_item_cap_px: i32 = ((usable_row_w - start_x) as f32 * 0.35).max(140.0) as i32;
-
     let mut count_in_row = 0usize;
 
     let mut block_for = |label: &str, cap_px: i32| -> i32 {
@@ -345,7 +342,6 @@ fn estimate_top_bottom_legend_height_px(
             .map(|s| estimate_text_width_px(s, font_px) as i32)
             .max()
             .unwrap_or(0);
-        // Return the full block width (dot+gap+text+trailing)
         marker_to_text_gap + marker_radius + max_line_w + trailing_gap
     };
 
@@ -357,11 +353,9 @@ fn estimate_top_bottom_legend_height_px(
         let mut block_w = block_for(label, text_cap_now);
 
         if x + block_w > usable_row_w {
-            // close previous row
             if count_in_row > 0 {
                 rows_item_counts.push(count_in_row);
             }
-            // start new row
             x = start_x;
             count_in_row = 0;
 
@@ -378,16 +372,13 @@ fn estimate_top_bottom_legend_height_px(
         rows_item_counts.push(count_in_row);
     }
 
-    // Determine number of columns as the maximum items per row
     let k_cols = rows_item_counts.iter().copied().max().unwrap_or(1);
 
-    // Define a uniform slot width so that K columns ALWAYS fit.
-    // Each slot accommodates: dot + gap + text (wrapped to cap) + trailing.
+    // Uniform per-column slot width so columns align vertically across rows
     let slot_w = ((usable_row_w - start_x) / (k_cols as i32)).max(60);
     let text_cap_uniform = (slot_w - (marker_to_text_gap + marker_radius + trailing_gap)).max(40);
 
-    // Pass 2 (estimation of height): knowing K and the uniform text cap,
-    // recompute each row’s tallest block height and sum them.
+    // Pass 2: re-wrap with uniform width and sum tallest row heights
     let mut row_heights: Vec<i32> = Vec::new();
     let mut col_i = 0usize;
     let mut row_max_h = line_h;
@@ -398,7 +389,6 @@ fn estimate_top_bottom_legend_height_px(
     };
 
     for label in labels {
-        // new row if we have placed k_cols items already
         if col_i == k_cols {
             row_heights.push(row_max_h);
             row_max_h = line_h;
@@ -412,7 +402,6 @@ fn estimate_top_bottom_legend_height_px(
         row_heights.push(row_max_h);
     }
 
-    // Sum row heights with gaps and paddings
     for (idx, rh) in row_heights.iter().enumerate() {
         height += *rh;
         if idx + 1 < row_heights.len() {
@@ -627,10 +616,12 @@ fn truncate_to_width(text: &str, font_px: u32, max_px: u32) -> String {
 fn draw_legend_panel<DB: DrawingBackend>(
     legend_area: &DrawingArea<DB, Shift>,
     items: &[(String, RGBAColor)],
-    title: &str, // pass "" to omit (recommended)
+    title: &str,
     placement: LegendMode,
-    axis_x_start_px: i32, // plot’s X-axis start (from root’s left edge)
+    axis_x_start_px: i32,
 ) -> anyhow::Result<()> {
+    // IMPORTANT: wrap Plotters errors into anyhow via Debug string.
+    // This avoids requiring 'static/Error bounds on DB::ErrorType.
     legend_area
         .fill(&WHITE)
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
@@ -638,12 +629,12 @@ fn draw_legend_panel<DB: DrawingBackend>(
     let (w_u32, _) = legend_area.dim_in_pixel();
     let w = w_u32 as i32;
 
-    // Layout constants (must match estimator)
-    let font_px: u32 = 14; // row font size
-    let line_h: i32 = font_px as i32 + 2; // per-line height for wrapped text (tighter)
-    let row_gap: i32 = 4; // smaller vertical gap between legend rows
-    let pad_small: i32 = 6; // small gutter/padding
-    let pad_band: i32 = 8; // inner padding for top/bottom bands
+    // Layout constants (keep in sync with estimator)
+    let font_px: u32 = 14;
+    let line_h: i32 = font_px as i32 + 2;
+    let row_gap: i32 = 4;
+    let pad_small: i32 = 6;
+    let pad_band: i32 = 8;
     let marker_radius: i32 = 4;
     let marker_to_text_gap: i32 = 12;
     let trailing_gap: i32 = 12;
@@ -655,14 +646,10 @@ fn draw_legend_panel<DB: DrawingBackend>(
         .pos(Pos::new(HPos::Left, VPos::Top));
     let label_style_center: TextStyle =
         TextStyle::from((FontFamily::SansSerif, font_px)).pos(Pos::new(HPos::Left, VPos::Center));
-    let label_style_top: TextStyle =
-        TextStyle::from((FontFamily::SansSerif, font_px)).pos(Pos::new(HPos::Left, VPos::Top));
 
     match placement {
         LegendMode::Right => {
-            // (unchanged) existing right-panel logic...
-            // Keep your current implementation here.
-            // Ensure any spacing tweaks are mirrored if you adjust constants above.
+            // Right-panel: simple single-column list
             let pad_x: i32 = 6;
 
             let mut y = if has_title {
@@ -709,33 +696,10 @@ fn draw_legend_panel<DB: DrawingBackend>(
         }
 
         LegendMode::Top | LegendMode::Bottom => {
-            // Align first item to the chart’s X-axis start
+            // Column-aligned (table-like) multi-row legend.
+
+            // 1) Title and starting Y
             let start_x = axis_x_start_px;
-
-            // Band width and per-item cap (avoid one very long label eating the row)
-            let w = w_u32 as i32;
-            let usable_row_w = w - pad_small;
-            let per_item_cap_px: i32 = ((usable_row_w - start_x) as f32 * 0.35).max(140.0) as i32;
-
-            // Center-anchored text style (so y is the line center)
-            let label_style_center: TextStyle = TextStyle::from((FontFamily::SansSerif, font_px))
-                .pos(Pos::new(HPos::Left, VPos::Center));
-
-            // Helper to compute a wrapped block (width/height/lines) given a text width cap
-            let mut make_block = |label: &str, text_cap_px: i32| {
-                let cap = text_cap_px.max(40) as u32;
-                let lines = wrap_text_to_width(label, font_px, cap);
-                let max_line_w = lines
-                    .iter()
-                    .map(|s| estimate_text_width_px(s, font_px) as i32)
-                    .max()
-                    .unwrap_or(0);
-                let block_w = marker_to_text_gap + marker_radius + max_line_w + trailing_gap;
-                let block_h = (lines.len().max(1) as i32) * line_h;
-                (block_w, block_h, lines)
-            };
-
-            // Title (optional)
             let mut y_top = if has_title {
                 let title_y_top = pad_band;
                 legend_area
@@ -750,79 +714,129 @@ fn draw_legend_panel<DB: DrawingBackend>(
                 pad_band + 8
             };
 
-            // Row layout state: horizontal cursor and tallest block in the current row
-            let mut x = start_x;
-            let mut row_max_h = line_h; // will grow if a multi-line label appears
+            // 2) Pass 1: greedy pack into rows to determine number of columns K
+            let usable_row_w = w - pad_small;
+            let per_item_cap_px: i32 = ((usable_row_w - start_x) as f32 * 0.35).max(140.0) as i32;
 
-            for (label, color) in items {
-                // Remaining width on current line and the max text width we allow on THIS line
+            #[derive(Clone)]
+            struct FirstBlock {
+                label: String,
+                color: RGBAColor,
+                block_w: i32,
+            }
+
+            let mut rows: Vec<Vec<FirstBlock>> = Vec::new();
+            let mut cur: Vec<FirstBlock> = Vec::new();
+            let mut x = start_x;
+
+            let mut block_width_for = |label: &str, cap_px: i32| -> i32 {
+                let cap = cap_px.max(40) as u32;
+                let lines = wrap_text_to_width(label, font_px, cap);
+                let max_line_w = lines
+                    .iter()
+                    .map(|s| estimate_text_width_px(s, font_px) as i32)
+                    .max()
+                    .unwrap_or(0);
+                marker_to_text_gap + marker_radius + max_line_w + trailing_gap
+            };
+
+            for (label, color) in items.iter() {
                 let remaining_line_px = (usable_row_w - x).max(40);
                 let text_cap_now =
                     remaining_line_px - (marker_to_text_gap + marker_radius + trailing_gap);
                 let text_cap_now = text_cap_now.min(per_item_cap_px);
 
-                // First try: wrap to the remaining space on the current line
-                let (mut block_w, mut block_h, mut lines) = make_block(label, text_cap_now);
+                let mut block_w = block_width_for(label, text_cap_now);
 
-                // If it wouldn't fit on this row, move to a fresh row and re-wrap
-                if x + block_w > usable_row_w {
-                    // IMPORTANT: advance by the previous row's max height (not by this block)
-                    // This keeps the vertical rhythm tight and predictable.
-                    y_top += row_max_h + row_gap;
-
-                    // Reset row state
+                if x + block_w > usable_row_w && !cur.is_empty() {
+                    rows.push(cur);
+                    cur = Vec::new();
                     x = start_x;
-                    row_max_h = line_h;
 
-                    // Re-wrap with a fresh-row text cap
                     let fresh_text_cap = ((usable_row_w - start_x)
                         - (marker_to_text_gap + marker_radius + trailing_gap))
                         .min(per_item_cap_px);
-                    let (bw2, bh2, lines2) = make_block(label, fresh_text_cap);
-                    block_w = bw2;
-                    block_h = bh2;
-                    lines = lines2;
+                    block_w = block_width_for(label, fresh_text_cap);
                 }
 
-                // Update current row's max height BEFORE computing the row's center
-                row_max_h = row_max_h.max(block_h);
+                x += block_w;
+                cur.push(FirstBlock {
+                    label: label.clone(),
+                    color: color.clone(),
+                    block_w,
+                });
+            }
+            if !cur.is_empty() {
+                rows.push(cur);
+            }
 
-                // Row center is based on the tallest item in this row
-                let y_center = y_top + row_max_h / 2;
+            let k_cols = rows.iter().map(|r| r.len()).max().unwrap_or(1) as i32;
+            let slot_w = ((usable_row_w - start_x) / k_cols).max(60);
+            let text_cap_uniform =
+                (slot_w - (marker_to_text_gap + marker_radius + trailing_gap)).max(40) as u32;
 
-                // Draw dot (marker) to the left of the text block
-                let text_x = x;
-                let dot_x = (text_x - marker_to_text_gap).max(0);
-                legend_area
-                    .draw(&Circle::new(
-                        (dot_x, y_center),
-                        marker_radius,
-                        color.clone().filled(),
-                    ))
-                    .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+            // 3) Pass 2: re-wrap with uniform per-column width; compute per-row heights
+            #[derive(Clone)]
+            struct Block {
+                lines: Vec<String>,
+                color: RGBAColor,
+            }
+            let mut laid_out: Vec<Vec<Block>> = Vec::new();
+            let mut row_heights: Vec<i32> = Vec::new();
 
-                // Draw each wrapped line centered on its own line box
-                let top = y_center - block_h / 2;
-                for (i, ln) in lines.iter().enumerate() {
-                    let line_center_y = top + (i as i32) * line_h + line_h / 2;
+            for row in rows.iter() {
+                let mut blocks: Vec<Block> = Vec::new();
+                let mut row_max_h = line_h;
+                for fb in row {
+                    let lines = wrap_text_to_width(&fb.label, font_px, text_cap_uniform);
+                    let bh = (lines.len().max(1) as i32) * line_h;
+                    row_max_h = row_max_h.max(bh);
+                    blocks.push(Block {
+                        lines,
+                        color: fb.color.clone(),
+                    });
+                }
+                laid_out.push(blocks);
+                row_heights.push(row_max_h);
+            }
+
+            // 4) Render table-aligned rows: fixed x per column = start_x + j * slot_w
+            for (ri, row) in laid_out.iter().enumerate() {
+                let rh = row_heights[ri];
+                let y_center = y_top + rh / 2;
+
+                for (ci, block) in row.iter().enumerate() {
+                    let text_x = start_x + (ci as i32) * slot_w;
+                    let dot_x = (text_x - marker_to_text_gap).max(0);
+
                     legend_area
-                        .draw(&Text::new(
-                            ln.as_str(),
-                            (text_x, line_center_y),
-                            label_style_center.clone(),
+                        .draw(&Circle::new(
+                            (dot_x, y_center),
+                            marker_radius,
+                            block.color.clone().filled(),
                         ))
                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+                    let block_h = (block.lines.len().max(1) as i32) * line_h;
+                    let top = y_center - block_h / 2;
+                    for (i, ln) in block.lines.iter().enumerate() {
+                        let line_center_y = top + (i as i32) * line_h + line_h / 2;
+                        legend_area
+                            .draw(&Text::new(
+                                ln.as_str(),
+                                (text_x, line_center_y),
+                                label_style_center.clone(),
+                            ))
+                            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                    }
                 }
 
-                // Flow to the right
-                x += block_w;
+                y_top += rh + row_gap;
             }
         }
 
         LegendMode::Inside => {
-            // Inside mode doesn't use this panel
-            // (existing handling elsewhere)
-            // No-op here.
+            // Not used for external panel layout
         }
     }
 
