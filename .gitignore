@@ -21,3 +21,4 @@ target/
 *.csv
 *.svg
 *.png
+*.json
