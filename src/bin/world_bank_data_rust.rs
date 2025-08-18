@@ -86,8 +86,8 @@ struct GetArgs {
     #[arg(long, default_value = "en")]
     locale: String,
     /// Legend placement: inside (overlay), right (panel), top (band), or bottom (band).
-    /// Default: right
-    #[arg(long, value_enum, default_value = "right")]
+    /// Default: bottom
+    #[arg(long, value_enum, default_value_t = LegendPos::Bottom)]
     legend: LegendPos,
     /// Chart type: line, scatter, line-points, or area (default: line)
     #[arg(long = "plot-kind", value_enum, default_value = "line")]
@@ -237,7 +237,7 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             LegendPos::Top => viz::LegendMode::Top,
             LegendPos::Bottom => viz::LegendMode::Bottom,
         };
-        let title = args.title.as_deref().unwrap_or("World Bank Indicator(s)");
+        let title = args.title.as_deref().unwrap_or("World Bank Indicator(s)"); //title will be overriden later
         let plot_kind = match args.plot_kind {
             PlotKindArg::Line => viz::PlotKind::Line,
             PlotKindArg::Scatter => viz::PlotKind::Scatter,
