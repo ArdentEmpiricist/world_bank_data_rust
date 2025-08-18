@@ -2032,7 +2032,7 @@ dependencies = [
 
 [[package]]
 name = "world_bank_data_rust"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ahash",
  "anyhow",
