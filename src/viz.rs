@@ -64,6 +64,7 @@ use num_format::{Locale, ToFormattedString};
 use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters::series::{AreaSeries, LineSeries}; // <-- series types (features enabled above)
+use plotters::style::text_anchor::{HPos, Pos, VPos};
 use plotters::style::{FontFamily, FontStyle};
 
 use plotters_bitmap::BitMapBackend;
@@ -402,7 +403,7 @@ fn truncate_to_width(text: &str, font_px: u32, max_px: u32) -> String {
 }
 
 /// Draw a legend either on the right (single column), top (flow), or bottom (flow).
-/// - Uses a centered **circle** marker aligned with the text baseline.
+/// - Uses a **circle** marker centered on the text midline (no vertical misalignment).
 /// - Truncates **only** if a single label cannot fit on a *fresh* line.
 /// - Recomputes widths after wrapping so entries are not unnecessarily cut short.
 fn draw_legend_panel<DB: DrawingBackend>(
@@ -415,6 +416,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
         .fill(&WHITE)
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
+    // Title stays with default baseline alignment (looks fine and consistent)
     let title_font = (FontFamily::SansSerif, 16)
         .into_font()
         .style(FontStyle::Bold);
@@ -431,30 +433,34 @@ fn draw_legend_panel<DB: DrawingBackend>(
     let font_px: u32 = 14;
     let row_h: i32 = 22;
 
-    // Marker + gap before text + trailing gap after text
+    // Marker + gaps and width heuristic fudge
     let marker_radius: i32 = 4;
     let marker_to_text_gap: i32 = 12;
     let trailing_gap: i32 = 12;
-    let marker_block_w: i32 = 8 /*pad for marker placement*/ + marker_radius + marker_to_text_gap; // ~24–28px visually
-
-    // Small fudge to reduce over-estimation from the width heuristic
+    let marker_block_w: i32 = 8 + marker_radius + marker_to_text_gap; // ~24–28px visually
     let fudge_px: u32 = 6;
+
+    // Legend label text style: **Left/Center** anchors the text’s vertical center on y
+    let label_style: TextStyle =
+        TextStyle::from((FontFamily::SansSerif, font_px)).pos(Pos::new(HPos::Left, VPos::Center));
 
     match placement {
         LegendMode::Right => {
             // Single column; only truncate if label doesn’t fit panel width
             let mut y = start_y;
             for (label, color) in items {
-                let max_text_w = (w - 48).max(40) as u32; // safe bounds
+                let max_text_w = (w - 48).max(40) as u32;
                 let label_w = estimate_text_width_px(label, font_px);
                 let text = if label_w.saturating_sub(fudge_px) > max_text_w {
                     truncate_to_width(label, font_px, max_text_w)
                 } else {
                     label.clone()
                 };
+
                 let marker_x = pad_x + 12;
                 let text_x = pad_x + 24;
 
+                // Circle is centered at y; text is also centered vertically at y
                 legend_area
                     .draw(&Circle::new(
                         (marker_x, y),
@@ -463,46 +469,38 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 legend_area
-                    .draw(&Text::new(
-                        text.as_str(),
-                        (text_x, y),
-                        (FontFamily::SansSerif, font_px),
-                    ))
+                    .draw(&Text::new(text.as_str(), (text_x, y), label_style.clone()))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
                 y += row_h;
             }
         }
         LegendMode::Top | LegendMode::Bottom => {
-            // Flow layout with wrap. We *recompute* widths after a wrap and only
-            // truncate if the label can’t fit even on a fresh line.
+            // Flow layout with wrap; re-measure after wrapping and only truncate if needed.
             let mut x = pad_x;
             let mut y = start_y;
 
             for (label, color) in items {
-                // 1) Compute how much width remains on the current line.
+                // 1) Width remaining on current line
                 let line_limit_now = (w - x - pad_x).max(40) as u32;
-                // Full label width (rough measure)
                 let full_text_w = estimate_text_width_px(label, font_px);
 
-                // Minimum width for this legend item if rendered untruncated on *this* line:
-                // marker block + text + trailing gap
+                // Item width if drawn **untruncated** on this line
                 let mut item_w_now = marker_block_w + full_text_w as i32 + trailing_gap;
 
-                // 2) If it doesn't fit, wrap to new line and recompute without truncation.
+                // 2) Wrap if it doesn't fit, then recompute on fresh line
                 if x + item_w_now > (w - pad_x) {
                     x = pad_x;
                     y += row_h;
 
-                    // Recompute for a fresh line (max width available)
                     let line_limit_fresh = (w - x - pad_x).max(40) as u32;
                     item_w_now = marker_block_w + full_text_w as i32 + trailing_gap;
 
-                    // 3) Only truncate if even on a fresh line the full label is too wide.
+                    // 3) Only truncate if even on a fresh line the full label is too wide
                     let text_max_fresh =
                         line_limit_fresh.saturating_sub((marker_block_w + trailing_gap) as u32);
 
                     let text_to_draw = if full_text_w.saturating_sub(fudge_px) > text_max_fresh {
-                        // Now actually truncate to the fresh line’s capacity
                         truncate_to_width(label, font_px, text_max_fresh)
                     } else {
                         label.clone()
@@ -511,9 +509,9 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     let text_w = estimate_text_width_px(&text_to_draw, font_px) as i32;
                     let final_item_w = (marker_block_w + text_w + trailing_gap).min(w - 2 * pad_x);
 
-                    // Draw
                     let marker_x = x + 12;
                     let text_x = x + marker_block_w;
+
                     legend_area
                         .draw(&Circle::new(
                             (marker_x, y),
@@ -525,7 +523,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
                         .draw(&Text::new(
                             text_to_draw.as_str(),
                             (text_x, y),
-                            (FontFamily::SansSerif, font_px),
+                            label_style.clone(),
                         ))
                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
@@ -533,9 +531,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     continue;
                 }
 
-                // 4) Fits on current line without wrapping — render without truncation.
-                // (If you still want truncation for *this* line only when overflowing, do it here,
-                //  but we avoid it so labels remain complete when space exists.)
+                // 4) Fits on current line without wrapping — render full label, no truncation
                 let marker_x = x + 12;
                 let text_x = x + marker_block_w;
 
@@ -547,11 +543,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
                     ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 legend_area
-                    .draw(&Text::new(
-                        label.as_str(),
-                        (text_x, y),
-                        (FontFamily::SansSerif, font_px),
-                    ))
+                    .draw(&Text::new(label.as_str(), (text_x, y), label_style.clone()))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
                 x += item_w_now;
@@ -559,6 +551,7 @@ fn draw_legend_panel<DB: DrawingBackend>(
         }
         LegendMode::Inside => unreachable!("legend panel is not used for Inside mode"),
     }
+
     Ok(())
 }
 
