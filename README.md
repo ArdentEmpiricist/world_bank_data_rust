@@ -57,8 +57,8 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 
 ### Under the hood
 
-- **Hardened HTTPS client** (connect/request timeouts, limited redirects, descriptive `User-Agent`).
-- **Robust URL handling** (percent-encoded path segments for user inputs).
+- **Hardened HTTPS client** (rustls, connect/request timeouts, limited redirects, descriptive `User-Agent`: `world_bank_data_rust`).
+- **Robust URL handling**
 - **Transient error resilience** (small retry/backoff) and **page caps**.
 - **Valid JSON** under all inputs (`NaN`/`±∞` → `null`).
 - **Numerical stability** (non-finite values treated as missing; safe float sorting).
