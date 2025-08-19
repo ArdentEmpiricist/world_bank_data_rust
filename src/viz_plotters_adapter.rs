@@ -24,7 +24,6 @@
 //!
 //!     // 3) For bars: use `fill_style(&style)` with Rectangle::new(..., fill_style(&style))
 //!
-//! All comments and docs are in English.
 
 use plotters::element::DynElement;
 use plotters::prelude::*;

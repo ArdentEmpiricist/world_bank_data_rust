@@ -4,7 +4,6 @@
 //! - Country: assigned a stable base hue (primary identity).
 //! - Indicator: encodes variation as a shade/saturation offset and a marker/line-dash style (redundant).
 //!
-//! All comments and docs are in English.
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
