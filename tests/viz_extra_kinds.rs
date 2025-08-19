@@ -1,6 +1,6 @@
 use std::fs;
-use world_bank_data_rust::models::DataPoint;
-use world_bank_data_rust::viz::{self, LegendMode, PlotKind};
+use wbi_rs::models::DataPoint;
+use wbi_rs::viz::{self, LegendMode, PlotKind};
 
 fn points_three_series() -> Vec<DataPoint> {
     let make = |iso: &str, name: &str, shift: f64| -> Vec<DataPoint> {

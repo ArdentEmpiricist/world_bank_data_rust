@@ -6,8 +6,8 @@
 ///
 /// ### Example
 /// ```no_run
-/// # use world_bank_data_rust::storage;
-/// # use world_bank_data_rust::models::DataPoint;
+/// # use wbi_rs::storage;
+/// # use wbi_rs::models::DataPoint;
 /// let rows: Vec<DataPoint> = vec![];
 /// storage::save_csv(&rows, "out.csv")?;
 /// # Ok::<(), anyhow::Error>(())
@@ -17,8 +17,8 @@
 ///
 /// ### Example
 /// ```no_run
-/// # use world_bank_data_rust::storage;
-/// # use world_bank_data_rust::models::DataPoint;
+/// # use wbi_rs::storage;
+/// # use wbi_rs::models::DataPoint;
 /// let rows: Vec<DataPoint> = vec![];
 /// storage::save_json(&rows, "out.json")?;
 /// # Ok::<(), anyhow::Error>(())

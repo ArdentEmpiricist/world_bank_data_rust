@@ -1,5 +1,5 @@
-use world_bank_data_rust::models::DataPoint;
-use world_bank_data_rust::viz::util::derive_axis_unit;
+use wbi_rs::models::DataPoint;
+use wbi_rs::viz::util::derive_axis_unit;
 
 fn make_data_point(
     indicator_id: &str,

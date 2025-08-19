@@ -1,7 +1,7 @@
 //! Live API tests. Run with: `cargo test --features online -- --nocapture`
 #![cfg(feature = "online")]
 
-use world_bank_data_rust::{Client, DateSpec};
+use wbi_rs::{Client, DateSpec};
 
 #[test]
 fn fetch_small_range() {

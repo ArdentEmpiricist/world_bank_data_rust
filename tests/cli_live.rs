@@ -6,7 +6,7 @@ use std::process::Command;
 #[test]
 fn run_cli_get_and_plot() {
     // Cargo sets this to the path of the compiled binary named as in Cargo.toml [[bin]].
-    let exe = env!("CARGO_BIN_EXE_world_bank_data_rust");
+    let exe = env!("CARGO_BIN_EXE_wbi_rs");
     let tmp = std::env::temp_dir().join("wbd_cli_plot.svg");
     let status = Command::new(exe)
         .args([

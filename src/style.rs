@@ -11,7 +11,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! world_bank_data_rust = { version = "0.1", features = ["country-styles"] }
+//! wbi_rs = { version = "0.1", features = ["country-styles"] }
 //! ```
 //!
 //! # Example
@@ -19,7 +19,7 @@
 //! ```rust
 //! # #[cfg(feature = "country-styles")]
 //! # {
-//! use world_bank_data_rust::style::{SeriesKey, assign_country_styles};
+//! use wbi_rs::style::{SeriesKey, assign_country_styles};
 //!
 //! let series = vec![
 //!     SeriesKey::new("USA".to_string(), "GDP".to_string()),
@@ -28,7 +28,7 @@
 //! ];
 //!
 //! let styles = assign_country_styles(&series, 255);
-//! 
+//!
 //! // All USA series will have the same base_hue
 //! // Different indicators will have different shades, markers, and dash patterns
 //! # }
@@ -37,7 +37,7 @@
 //! # Design Principles
 //!
 //! - **Country consistency**: All series for the same country use the same base hue
-//! - **Indicator differentiation**: Different indicators use brightness variations, 
+//! - **Indicator differentiation**: Different indicators use brightness variations,
 //!   unique marker shapes, and line dash patterns for redundant visual encoding
 //! - **Deterministic**: Identical inputs always produce identical outputs
 //! - **MS Office compatibility**: Uses the standard MS Office color palette
@@ -122,16 +122,16 @@ impl SeriesStyle {
 
 /// MS Office color palette (RGB values).
 const MS_OFFICE_PALETTE: [(u8, u8, u8); 10] = [
-    (68, 114, 196),   // blue
-    (237, 125, 49),   // orange
-    (165, 165, 165),  // gray
-    (255, 192, 0),    // gold
-    (91, 155, 213),   // light blue
-    (112, 173, 71),   // green
-    (38, 68, 120),    // dark blue
-    (158, 72, 14),    // dark orange
-    (99, 99, 99),     // dark gray
-    (153, 115, 0),    // brownish
+    (68, 114, 196),  // blue
+    (237, 125, 49),  // orange
+    (165, 165, 165), // gray
+    (255, 192, 0),   // gold
+    (91, 155, 213),  // light blue
+    (112, 173, 71),  // green
+    (38, 68, 120),   // dark blue
+    (158, 72, 14),   // dark orange
+    (99, 99, 99),    // dark gray
+    (153, 115, 0),   // brownish
 ];
 
 /// Assign country-consistent styles using the MS Office palette.
@@ -169,7 +169,7 @@ pub fn assign_country_styles_with_palette(
     use std::hash::{Hash, Hasher};
 
     let mut result = HashMap::new();
-    
+
     // Helper function to create a stable hash
     fn stable_hash<T: Hash>(value: &T) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -231,19 +231,19 @@ pub fn assign_country_styles_with_palette(
         let country_index = country_to_index[&series_key.country];
         let base_color = palette[country_index];
         let base_hue = rgb_to_hue(base_color);
-        
+
         // Generate deterministic variations based on indicator
         let indicator_hash = stable_hash(&series_key.indicator);
-        
+
         // Create shade variation (brightness adjustment)
         let brightness_factor = 0.7 + 0.6 * ((indicator_hash % 100) as f64 / 100.0);
         let adjusted_color = adjust_brightness(base_color, brightness_factor);
         let shade = Rgba::new(adjusted_color.0, adjusted_color.1, adjusted_color.2, alpha);
-        
+
         // Assign marker and dash based on indicator
         let marker = hash_to_marker(indicator_hash);
         let dash = hash_to_dash(indicator_hash.rotate_left(16));
-        
+
         let style = SeriesStyle::new(base_hue, shade, marker, dash);
         result.insert(series_key.clone(), style);
     }
@@ -253,16 +253,20 @@ pub fn assign_country_styles_with_palette(
 
 /// Convert RGB to approximate hue (in degrees 0-360).
 fn rgb_to_hue(rgb: (u8, u8, u8)) -> f64 {
-    let (r, g, b) = (rgb.0 as f64 / 255.0, rgb.1 as f64 / 255.0, rgb.2 as f64 / 255.0);
-    
+    let (r, g, b) = (
+        rgb.0 as f64 / 255.0,
+        rgb.1 as f64 / 255.0,
+        rgb.2 as f64 / 255.0,
+    );
+
     let max = r.max(g).max(b);
     let min = r.min(g).min(b);
     let delta = max - min;
-    
+
     if delta == 0.0 {
         return 0.0;
     }
-    
+
     let hue = if max == r {
         60.0 * (((g - b) / delta) % 6.0)
     } else if max == g {
@@ -270,12 +274,8 @@ fn rgb_to_hue(rgb: (u8, u8, u8)) -> f64 {
     } else {
         60.0 * ((r - g) / delta + 4.0)
     };
-    
-    if hue < 0.0 {
-        hue + 360.0
-    } else {
-        hue
-    }
+
+    if hue < 0.0 { hue + 360.0 } else { hue }
 }
 
 /// Convenience function using the MS Office palette.
@@ -331,7 +331,7 @@ mod tests {
         let _usa_gdp_marker = styles[&series[0]].marker;
         let _deu_gdp_marker = styles[&series[2]].marker;
         // May or may not be different, but styles should be deterministic
-        
+
         // Test determinism - running again should give same results
         let styles2 = assign_country_styles(&series, 255);
         assert_eq!(styles, styles2);
@@ -346,10 +346,10 @@ mod tests {
 
         let styles1 = assign_country_styles(&series, 200);
         let styles2 = assign_country_styles(&series, 200);
-        
+
         // Results should be identical across multiple calls
         assert_eq!(styles1, styles2);
-        
+
         // Should have assigned styles for all series
         assert_eq!(styles1.len(), 2);
         assert!(styles1.contains_key(&series[0]));

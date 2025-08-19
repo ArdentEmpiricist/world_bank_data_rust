@@ -2,12 +2,12 @@ use anyhow::{Result, bail};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use num_format::{Locale, ToFormattedString};
 use std::path::{Path, PathBuf};
-use world_bank_data_rust::{Client, DateSpec};
-use world_bank_data_rust::{stats, storage, viz};
+use wbi_rs::{Client, DateSpec};
+use wbi_rs::{stats, storage, viz};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "world_bank_data_rust",
+    name = "wbi",
     version,
     about = "Fetch, store, visualize & summarize World Bank indicators"
 )]
@@ -263,9 +263,13 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             args.loess_span,
             {
                 #[cfg(feature = "country-styles")]
-                { Some(args.country_styles) }
+                {
+                    Some(args.country_styles)
+                }
                 #[cfg(not(feature = "country-styles"))]
-                { None }
+                {
+                    None
+                }
             },
         )?;
         eprintln!("Wrote plot to {}", plot_path.display());

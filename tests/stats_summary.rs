@@ -1,5 +1,5 @@
-use world_bank_data_rust::models::{DataPoint, GroupKey};
-use world_bank_data_rust::stats::grouped_summary;
+use wbi_rs::models::{DataPoint, GroupKey};
+use wbi_rs::stats::grouped_summary;
 
 fn dp(ind_id: &str, c_iso3: &str, year: i32, v: Option<f64>) -> DataPoint {
     DataPoint {

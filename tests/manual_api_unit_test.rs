@@ -1,4 +1,4 @@
-use world_bank_data_rust::{models::DataPoint, viz};
+use wbi_rs::{models::DataPoint, viz};
 
 #[test]
 fn test_api_unit_in_chart_output() {
@@ -43,13 +43,14 @@ fn test_api_unit_in_chart_output() {
         viz::PlotKind::LinePoints,
         0.3,
         None, // no country styles in tests
-    ).unwrap();
+    )
+    .unwrap();
 
     // Check if the SVG contains the API-provided unit
     let svg_content = std::fs::read_to_string(&output_path).unwrap();
-    
+
     // The Y-axis title should contain "Number" from the API-provided unit
-    // It may also have scaling like "Number (millions)" 
+    // It may also have scaling like "Number (millions)"
     assert!(
         svg_content.to_lowercase().contains("number"),
         "Expected Y-axis to contain API-provided unit 'Number'. SVG content: {}",

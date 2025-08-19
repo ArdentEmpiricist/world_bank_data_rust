@@ -17,8 +17,8 @@ use serde::{Deserialize, Serialize};
 ///
 /// ### Example
 /// ```
-/// use world_bank_data_rust::models::DataPoint;
-/// use world_bank_data_rust::stats::grouped_summary;
+/// use wbi_rs::models::DataPoint;
+/// use wbi_rs::stats::grouped_summary;
 ///
 /// let rows = vec![
 ///     DataPoint { indicator_id: "X".into(), indicator_name: "Demo".into(),
