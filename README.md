@@ -91,7 +91,7 @@ As a library (example):
 
 ```toml
 [dependencies]
-world_bank_data_rust = "0.1"
+world_bank_data_rust = "0.1" # or your path
 anyhow = "1"
 ```
 
