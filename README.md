@@ -1,7 +1,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/wbi-rs?label=Crates.io)](https://crates.io/crates/wbi-rs)
-[![rust-clippy analyze](https://img.shields.io/github/actions/workflow/status/ardentempiricist/world_bank_data_rust/rust-clippy.yml?label=Rust%20Clippy)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/rust-clippy.yml)
-[![Deploy](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml)
+[![rust-clippy analyze](https://img.shields.io/github/actions/workflow/status/ardentempiricist/wbi-rs/rust-clippy.yml?label=Rust%20Clippy)](https://github.com/ArdentEmpiricist/wbi-rs/actions/workflows/rust-clippy.yml)
+[![Deploy](https://github.com/ArdentEmpiricist/wbi-rs/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArdentEmpiricist/wbi-rs/actions/workflows/deploy.yml)
 [![Documentation](https://docs.rs/wbi-rs/badge.svg)](https://docs.rs/wbi-rs/)
 [![Crates.io](https://img.shields.io/crates/d/wbi-rs?color=darkblue&label=Downloads)](https://crates.io/crates/wbi-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -9,7 +9,7 @@
 # World Bank Data Rust 🦀📊📈
 
 <p align="center">
-  <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="world_bank_data_rust Logo" width="200"/>
+  <img src="https://github.com/ArdentEmpiricist/wbi-rs/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="wbi-rs Logo" width="200"/>
 </p>
 
 Fetch, analyze, and visualize World Bank data from Rust.  
@@ -70,7 +70,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 
 Download a prebuilt binary (GitHub Releases):
 
-1) Go to **GitHub → Releases**: [https://github.com/ArdentEmpiricist/world_bank_data_rust/releases/new](https://github.com/ArdentEmpiricist/world_bank_data_rust/releases/new)
+1) Go to **GitHub → Releases**: [https://github.com/ArdentEmpiricist/wbi-rs/releases/new](https://github.com/ArdentEmpiricist/wbi-rs/releases/new)
 2) Download the asset for your platform
 
 Via cargo/crates.io:
@@ -84,7 +84,7 @@ From source:
 
 ```bash
 git clone <this-repo>
-cd world_bank_data_rust
+cd wbi-rs
 cargo build --release
 ```
 
@@ -113,7 +113,7 @@ wbi get \
 
 Output:
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/refs/heads/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/refs/heads/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
 </p>
 
 Fetch GDP (in current US$) for the US, China, Germany and India and render a plot (backend inferred from extension):
@@ -129,7 +129,7 @@ wbi get \
 
 Output:
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="example plot" style='width: 90%; object-fit: contain'/>
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="example plot" style='width: 90%; object-fit: contain'/>
 </p>
 
 ### Country-Consistent Styling (Feature-Gated)
