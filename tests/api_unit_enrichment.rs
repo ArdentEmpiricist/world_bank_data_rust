@@ -65,16 +65,15 @@ fn test_datapoint_unit_enrichment_concept() {
 
     // Simulate the enrichment logic from the fetch method
     for point in &mut points {
-        if point.unit.is_none()
+        if (point.unit.is_none()
             || point
                 .unit
                 .as_ref()
                 .map(|u| u.trim().is_empty())
-                .unwrap_or(false)
+                .unwrap_or(false))
+            && let Some(unit) = indicator_units.get(&point.indicator_id)
         {
-            if let Some(unit) = indicator_units.get(&point.indicator_id) {
-                point.unit = Some(unit.clone());
-            }
+            point.unit = Some(unit.clone());
         }
     }
 
@@ -111,16 +110,15 @@ fn test_unit_enrichment_preserves_existing_units() {
 
     // Simulate enrichment logic
     for point in &mut points {
-        if point.unit.is_none()
+        if (point.unit.is_none()
             || point
                 .unit
                 .as_ref()
                 .map(|u| u.trim().is_empty())
-                .unwrap_or(false)
+                .unwrap_or(false))
+            && let Some(unit) = indicator_units.get(&point.indicator_id)
         {
-            if let Some(unit) = indicator_units.get(&point.indicator_id) {
-                point.unit = Some(unit.clone());
-            }
+            point.unit = Some(unit.clone());
         }
     }
 

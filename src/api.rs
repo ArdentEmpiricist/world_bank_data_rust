@@ -167,10 +167,10 @@ impl Client {
         // Build map from ID to unit
         let mut result = HashMap::new();
         for meta in indicators_data {
-            if let Some(unit) = meta.unit {
-                if !unit.trim().is_empty() {
-                    result.insert(meta.id, unit);
-                }
+            if let Some(unit) = meta.unit
+                && !unit.trim().is_empty()
+            {
+                result.insert(meta.id, unit);
             }
         }
 
@@ -205,7 +205,7 @@ impl Client {
         if indicators.len() > 1 && source.is_none() {
             let mut all_points = Vec::new();
             for indicator in indicators {
-                let points = self.fetch(countries, &[indicator.clone()], date.clone(), None)?;
+                let points = self.fetch(countries, std::slice::from_ref(indicator), date, None)?;
                 all_points.extend(points);
             }
             return Ok(all_points);
@@ -299,16 +299,15 @@ impl Client {
                 Ok(indicator_units) => {
                     // Enrich DataPoints that lack units
                     for point in &mut out {
-                        if point.unit.is_none()
+                        if (point.unit.is_none()
                             || point
                                 .unit
                                 .as_ref()
                                 .map(|u| u.trim().is_empty())
-                                .unwrap_or(false)
+                                .unwrap_or(false))
+                            && let Some(unit) = indicator_units.get(&point.indicator_id)
                         {
-                            if let Some(unit) = indicator_units.get(&point.indicator_id) {
-                                point.unit = Some(unit.clone());
-                            }
+                            point.unit = Some(unit.clone());
                         }
                     }
                 }
