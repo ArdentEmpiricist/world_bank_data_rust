@@ -60,8 +60,25 @@ pub fn extract_unit_from_indicator_name(name: &str) -> Option<String> {
     }
 }
 
-/// If (and only if) a single indicator is shown, derive a common unit string from its name.
+/// Derive a common unit string, preferring API-provided units when consistent.
+///
+/// Logic:
+/// 1) Collect all non-empty `unit` values from DataPoint.unit
+/// 2) If there's exactly one unique non-empty unit string, use it
+/// 3) Otherwise, fall back to existing behavior: if single indicator, extract unit from name
 pub fn derive_axis_unit(points: &[DataPoint]) -> Option<String> {
+    // 1) Prefer consistent API-provided unit
+    let units: BTreeSet<&str> = points
+        .iter()
+        .filter_map(|p| p.unit.as_deref())
+        .filter(|u| !u.is_empty())
+        .collect();
+
+    if units.len() == 1 {
+        return Some(units.iter().next().unwrap().to_string());
+    }
+
+    // 2) Fall back to existing behavior: extract from indicator name if single indicator
     let names: BTreeSet<&str> = points.iter().map(|p| p.indicator_name.as_str()).collect();
     if names.len() == 1 {
         extract_unit_from_indicator_name(names.iter().next().unwrap())
