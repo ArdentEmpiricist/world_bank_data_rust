@@ -24,7 +24,7 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "wbi"
-path = "src/bin/world_bank_data_rust.rs"
+path = "src/bin/wbi.rs"
 
 [features]
 # Enable this to run tests that hit the live World Bank API. Use: cargo test --features online
