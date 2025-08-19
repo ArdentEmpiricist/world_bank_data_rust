@@ -183,7 +183,7 @@ The crate exposes modules for API access, models, storage, statistics, and plott
 
 ```toml
 [dependencies]
-world_bank_data_rust = { path = "." } # change to your source
+world_bank_data_rust = "0.1" # or "{ path = "." } to your source"
 anyhow = "1"
 ```
 
