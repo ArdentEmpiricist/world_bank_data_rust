@@ -1,25 +1,34 @@
 /// Synchronous client for the **World Bank Indicators API (v2)**.
 ///
-/// This module focuses on the `country/{codes}/indicator/{codes}` endpoint and returns
-/// results as tidy `models::DataPoint` rows. Pagination is handled automatically.
+/// This module provides access to both observation data from the `country/{codes}/indicator/{codes}` 
+/// endpoint and indicator metadata from the `indicator/{id}` endpoint. Results are returned as tidy 
+/// `models::DataPoint` rows with automatic pagination handling.
+///
+/// ### Endpoints supported
+/// - **Observations**: `country/{codes}/indicator/{codes}` - returns time series data
+/// - **Indicator metadata**: `indicator/{id}` - returns metadata including units
 ///
 /// ### Notes
 /// - The API sometimes serializes `per_page` as a **string**; we accept both string/number.
 /// - When requesting **multiple indicators** at once, the API requires a `source` parameter
 ///   (e.g., `source=2` for WDI). Pass it via `Client::fetch(..., Some(2))`.
 /// - Network timeouts use a sane default (30s) and can be adjusted by editing the client builder.
+/// - Use `populate_units_from_metadata()` to enhance DataPoints with proper unit information.
 ///
 ///
 /// Typical usage:
 /// ```no_run
 /// # use world_bank_data_rust::{Client, DateSpec};
 /// let client = Client::default();
-/// let rows = client.fetch(
+/// let mut rows = client.fetch(
 ///     &["DEU".into()],
 ///     &["SP.POP.TOTL".into()],
 ///     Some(DateSpec::Year(2020)),
 ///     None,
 /// )?;
+/// 
+/// // Optionally populate missing units from metadata
+/// client.populate_units_from_metadata(&mut rows)?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
 use crate::models::{DataPoint, DateSpec, Entry, Meta, IndicatorMetadata};

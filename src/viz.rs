@@ -5,6 +5,7 @@
 //! - Legend placement: `Inside`, `Right`, `Top`, `Bottom` (non-overlapping for external legends)
 //! - Plot kinds: `Line`, `Scatter`, `LinePoints`, `Area`, `StackedArea`, `GroupedBar`, `Loess`
 //! - Custom chart title and legend handling for long labels
+//! - Intelligent unit detection: prefers DataPoint.unit from metadata, falls back to parsing indicator names
 ///
 /// Where to place the legend.
 /// - `Inside`: overlay inside the plot (may overlap data)
