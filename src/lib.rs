@@ -58,8 +58,7 @@ pub mod viz;
 pub mod viz_plotters_adapter;
 pub mod viz_style;
 
-// Feature-gated country-consistent styling module
-#[cfg(feature = "country-styles")]
+// Country-consistent styling module (always available)
 pub mod style;
 
 pub use api::Client;
