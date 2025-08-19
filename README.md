@@ -6,7 +6,7 @@
 [![Crates.io](https://img.shields.io/crates/d/wbi-rs?color=darkblue&label=Downloads)](https://crates.io/crates/wbi-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-# World Bank Data Rust 🦀📊📈
+# wbi-rs 🦀📊📈
 
 <p align="center">
   <img src="https://github.com/ArdentEmpiricist/wbi-rs/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="wbi-rs Logo" width="200"/>
