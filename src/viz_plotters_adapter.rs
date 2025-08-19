@@ -1,7 +1,7 @@
 //! Adapter helpers to use SeriesStyle with the plotters crate.
 //!
 //! Usage example (inside your plotting function):
-//!
+//! ```ignore
 //!     use plotters::prelude::*;
 //!     use crate::viz_style::SeriesStyle;
 //!     use crate::viz_plotters_adapter::{rgb_color, line_style, fill_style, make_marker};
