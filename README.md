@@ -91,7 +91,7 @@ As a library (example):
 
 ```toml
 [dependencies]
-world_bank_data_rust = { path = "." } # replace with git or registry when published
+world_bank_data_rust = "0.1"
 anyhow = "1"
 ```
 
