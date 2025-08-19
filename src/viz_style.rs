@@ -138,13 +138,7 @@ fn stable_hash64<T: Hash>(t: T) -> u64 {
 }
 
 fn clamp01(x: f64) -> f64 {
-    if x < 0.0 {
-        0.0
-    } else if x > 1.0 {
-        1.0
-    } else {
-        x
-    }
+    x.clamp(0.0, 1.0)
 }
 
 fn map_u64_to_range(x: u64, min: f64, max: f64) -> f64 {
