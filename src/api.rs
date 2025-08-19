@@ -182,7 +182,10 @@ impl Client {
     /// - `countries`: ISO2 (e.g., "DE") or ISO3 (e.g., "DEU") or aggregates (e.g., "EUU"). Multiple accepted.
     /// - `indicators`: e.g., "SP.POP.TOTL". Multiple accepted.
     /// - `date`: A single year or inclusive range.
-    /// - `source`: Optional numeric source id (e.g., 2 for WDI). Required by API when querying *multiple* indicators.
+    /// - `source`: Optional numeric source id (e.g., 2 for WDI). Required by the World Bank API
+    ///   for efficient single-call multi-indicator requests. When `source` is `None` and multiple
+    ///   indicators are requested, this method automatically falls back to individual requests
+    ///   per indicator and merges the results.
     pub fn fetch(
         &self,
         countries: &[String],
