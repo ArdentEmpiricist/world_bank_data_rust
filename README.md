@@ -131,7 +131,7 @@ world_bank_data_rust get \
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="enc_file Logo" style='width: 100%; object-fit: contain'/>
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="enc_file Logo" style='width: 90%; object-fit: contain'/>
 </p>
 
 ---
