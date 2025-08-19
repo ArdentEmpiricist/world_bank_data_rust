@@ -41,6 +41,7 @@ fn api_provided_unit_appears_in_chart() {
         "Unit Test Chart",
         viz::PlotKind::LinePoints,
         0.3,
+        None, // no country styles in tests
     )
     .unwrap();
 

@@ -261,6 +261,12 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             title,
             plot_kind,
             args.loess_span,
+            {
+                #[cfg(feature = "country-styles")]
+                { Some(args.country_styles) }
+                #[cfg(not(feature = "country-styles"))]
+                { None }
+            },
         )?;
         eprintln!("Wrote plot to {}", plot_path.display());
     }

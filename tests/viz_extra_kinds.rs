@@ -72,6 +72,7 @@ fn stacked_area_and_grouped_bar_and_loess() {
             "Stacked",
             PlotKind::StackedArea,
             0.3,
+            None, // no country styles in tests
         )
         .unwrap();
     });
@@ -86,6 +87,7 @@ fn stacked_area_and_grouped_bar_and_loess() {
             "Bars",
             PlotKind::GroupedBar,
             0.3,
+            None, // no country styles in tests
         )
         .unwrap();
     });
@@ -100,6 +102,7 @@ fn stacked_area_and_grouped_bar_and_loess() {
             "Loess",
             PlotKind::Loess,
             0.25,
+            None, // no country styles in tests
         )
         .unwrap();
     });
