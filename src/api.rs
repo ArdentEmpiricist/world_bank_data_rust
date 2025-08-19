@@ -22,7 +22,7 @@
 /// )?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-use crate::models::{DataPoint, DateSpec, Entry, Meta};
+use crate::models::{DataPoint, DateSpec, Entry, Meta, IndicatorMetadata};
 use anyhow::{Context, Result, bail};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
 use reqwest::blocking::Client as HttpClient;
@@ -188,5 +188,132 @@ impl Client {
             page += 1;
         }
         Ok(out)
+    }
+
+    /// Fetch indicator metadata to get unit information.
+    ///
+    /// ### Arguments
+    /// - `indicator_id`: Single indicator ID (e.g., "SP.POP.TOTL")
+    ///
+    /// ### Returns
+    /// `IndicatorMetadata` containing id, name, and unit information
+    ///
+    /// ### Errors
+    /// - Network/HTTP error
+    /// - JSON decoding error
+    /// - API-level error payload
+    ///
+    /// ### Example
+    /// ```no_run
+    /// # use world_bank_data_rust::Client;
+    /// let cli = Client::default();
+    /// let metadata = cli.fetch_indicator_metadata("SP.POP.TOTL")?;
+    /// println!("Unit: {:?}", metadata.unit);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn fetch_indicator_metadata(&self, indicator_id: &str) -> Result<IndicatorMetadata> {
+        let encoded_id = percent_encoding::utf8_percent_encode(indicator_id.trim(), SAFE).to_string();
+        let url = format!("{}/indicator/{}?format=json", self.base_url, encoded_id);
+
+        // Use the same retry logic as fetch method
+        let get_json = |u: &str| -> Result<Value> {
+            let mut last_err: Option<anyhow::Error> = None;
+            for backoff_ms in [100u64, 300, 700] {
+                match self.http.get(u).send() {
+                    Ok(r) if r.status().is_success() => {
+                        return r.json().context("decode json");
+                    }
+                    Ok(r) if r.status().is_server_error() => { /* retry */ }
+                    Ok(r) => bail!("request failed with HTTP {}", r.status()),
+                    Err(e) => last_err = Some(e.into()),
+                }
+                std::thread::sleep(Duration::from_millis(backoff_ms));
+            }
+            bail!("network error: {:?}", last_err);
+        };
+
+        let v: Value = get_json(&url).with_context(|| format!("GET {}", url))?;
+
+        // The API returns an array: [Meta, [IndicatorMetadata, ...]]
+        let arr = v.as_array().ok_or_else(|| {
+            anyhow::anyhow!("unexpected response shape: not a top-level array")
+        })?;
+        if arr.is_empty() {
+            bail!("unexpected response: empty array");
+        }
+
+        // If first element has "message", surface API error.
+        if arr[0].get("message").is_some() {
+            bail!("world bank api error: {}", arr[0]);
+        }
+
+        // Parse the data array (position 1)
+        let indicators: Vec<IndicatorMetadata> = if arr.len() > 1 {
+            serde_json::from_value(arr[1].clone()).context("parse indicator metadata")?
+        } else {
+            vec![]
+        };
+
+        // Return the first indicator (should be the one we requested)
+        indicators.into_iter().next()
+            .ok_or_else(|| anyhow::anyhow!("no indicator metadata found for {}", indicator_id))
+    }
+
+    /// Populate DataPoint units from indicator metadata when missing.
+    /// 
+    /// This method fetches indicator metadata for any indicators that have
+    /// missing or empty units in the provided DataPoints and updates them.
+    ///
+    /// ### Arguments
+    /// - `points`: Mutable reference to DataPoints to update
+    ///
+    /// ### Returns
+    /// `Ok(())` on success, or error if metadata fetching fails
+    ///
+    /// ### Example
+    /// ```no_run
+    /// # use world_bank_data_rust::Client;
+    /// let cli = Client::default();
+    /// let mut points = cli.fetch(&["DEU".into()], &["SP.POP.TOTL".into()], None, None)?;
+    /// cli.populate_units_from_metadata(&mut points)?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn populate_units_from_metadata(&self, points: &mut [DataPoint]) -> Result<()> {
+        use std::collections::{HashMap, HashSet};
+        
+        // Find all indicators that need unit information
+        let mut indicators_needing_units: HashSet<String> = HashSet::new();
+        for point in points.iter() {
+            if point.unit.is_none() || point.unit.as_ref().map_or(true, |u| u.trim().is_empty()) {
+                indicators_needing_units.insert(point.indicator_id.clone());
+            }
+        }
+        
+        // Fetch metadata for indicators that need it
+        let mut metadata_cache: HashMap<String, Option<String>> = HashMap::new();
+        for indicator_id in indicators_needing_units {
+            match self.fetch_indicator_metadata(&indicator_id) {
+                Ok(metadata) => {
+                    metadata_cache.insert(indicator_id, metadata.unit);
+                }
+                Err(_) => {
+                    // If metadata fetch fails, leave the unit as-is
+                    // This ensures the method doesn't fail if some indicators
+                    // don't have metadata available
+                    metadata_cache.insert(indicator_id, None);
+                }
+            }
+        }
+        
+        // Update points with fetched metadata
+        for point in points.iter_mut() {
+            if point.unit.is_none() || point.unit.as_ref().map_or(true, |u| u.trim().is_empty()) {
+                if let Some(metadata_unit) = metadata_cache.get(&point.indicator_id) {
+                    point.unit = metadata_unit.clone();
+                }
+            }
+        }
+        
+        Ok(())
     }
 }

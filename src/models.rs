@@ -161,6 +161,16 @@ impl From<Entry> for DataPoint {
     }
 }
 
+/// Indicator metadata from the indicator endpoint.
+/// Minimal structure to extract unit information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndicatorMetadata {
+    pub id: String,
+    #[serde(alias = "name")]
+    pub value: String,
+    pub unit: Option<String>,
+}
+
 /// Grouping key used in stats and plotting.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct GroupKey {

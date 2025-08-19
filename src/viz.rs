@@ -232,10 +232,27 @@ fn extract_unit_from_indicator_name(name: &str) -> Option<String> {
     }
 }
 
-/// If (and only if) a single indicator is shown, derive a common unit string from its name.
+/// If (and only if) a single indicator is shown, derive a common unit string.
+/// Prefers units from DataPoint.unit if available, falls back to parsing indicator names.
 fn derive_axis_unit(points: &[DataPoint]) -> Option<String> {
     use std::collections::BTreeSet;
-    let mut names: BTreeSet<&str> = points.iter().map(|p| p.indicator_name.as_str()).collect();
+    
+    // First, try to get unit from actual DataPoint.unit field
+    let units: BTreeSet<Option<&str>> = points.iter()
+        .map(|p| p.unit.as_deref())
+        .collect();
+    
+    // If we have a single non-empty unit across all points, use it
+    if units.len() == 1 {
+        if let Some(Some(unit)) = units.iter().next() {
+            if !unit.trim().is_empty() {
+                return Some(unit.to_string());
+            }
+        }
+    }
+    
+    // Fallback: extract from indicator names if single indicator 
+    let names: BTreeSet<&str> = points.iter().map(|p| p.indicator_name.as_str()).collect();
     if names.len() == 1 {
         extract_unit_from_indicator_name(names.iter().next().unwrap())
     } else {
