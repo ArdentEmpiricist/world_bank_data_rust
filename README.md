@@ -151,6 +151,7 @@ wbi get \
 ```
 
 This feature ensures that:
+
 - All series from the same country use the same base color hue
 - Different indicators within a country are differentiated by brightness variations
 - Marker shapes and line dash patterns provide additional visual distinction
@@ -278,6 +279,7 @@ plot_chart(&points, "pop.svg")?;
 ```
 
 Charts automatically derive appropriate units for axis labeling using a two-tier approach:
+
 1. **Prefer units from DataPoint.unit**: When all points have the same non-empty unit, use it directly for axis labeling
 2. **Fallback to indicator name parsing**: For single-indicator plots without consistent units, extract unit information from parentheses in the indicator name (e.g., "GDP (current US$)" → "current US$")
 
@@ -388,3 +390,13 @@ at your option.
 
 Any contribution intentionally submitted for inclusion in this work shall be
 dual licensed as above, without any additional terms or conditions.
+
+## Disclaimer
+
+This project is an independent, community-maintained library and CLI. It is not affiliated with, endorsed by, or sponsored by The World Bank Group or any of its institutions. “The World Bank” name and any related trademarks are the property of The World Bank Group and are used here solely for identification purposes.
+
+This software accesses publicly available data via the World Bank Indicators API. Your use of any World Bank data is governed by the World Bank’s terms and applicable data licenses. No warranty is provided; use at your own risk.
+
+- World Bank Indicators API: <https://datahelpdesk.worldbank.org/knowledgebase/articles/889392>
+- World Bank Terms of Use: <https://www.worldbank.org/terms>
+- World Bank Data Terms (incl. licensing): <https://datacatalog.worldbank.org/terms-and-conditions>
