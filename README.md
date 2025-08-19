@@ -135,7 +135,7 @@ world_bank_data_rust get \
 
 Subcommand `get` accepts at least:
 
-- `--countries` ISO2/ISO3 codes separated by `;` or `,` (e.g., `DEU;FRA`)
+- `--countries` ISO2/ISO3 codes separated by `,` or `;` (e.g., `DEU,FRA` or (attention: `" "` are required using `;`) `"DEU;FRA"`)
 - `--indicators` World Bank indicator IDs (e.g., `SP.POP.TOTL`)
 - `--date` optional year or range (e.g., `2020` or `2000:2023`)
 - `--out <PATH>` optional export (CSV/JSON); **atomic**
