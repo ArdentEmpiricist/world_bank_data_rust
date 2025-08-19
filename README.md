@@ -114,7 +114,7 @@ world_bank_data_rust get \
   <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/refs/heads/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
 </p>
 
-Render a plot (backend inferred from extension):
+Fetch GDP (in current US$) for US, China, Germany and India and render a plot (backend inferred from extension):
 
 ```bash
 world_bank_data_rust get \
