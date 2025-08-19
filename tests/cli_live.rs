@@ -11,11 +11,16 @@ fn run_cli_get_and_plot() {
     let status = Command::new(exe)
         .args([
             "get",
-            "--countries","DEU",
-            "--indicators","SP.POP.TOTL",
-            "--date","2019:2020",
-            "--plot", tmp.to_str().unwrap(),
-            "--legend","right"
+            "--countries",
+            "DEU",
+            "--indicators",
+            "SP.POP.TOTL",
+            "--date",
+            "2019:2020",
+            "--plot",
+            tmp.to_str().unwrap(),
+            "--legend",
+            "right",
         ])
         .status()
         .expect("spawn cli");

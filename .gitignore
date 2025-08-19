@@ -16,7 +16,9 @@ target/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-!.assets/logo.png
+!assets/logo.png
+!assets/example_plot.svg
+!assets/example_stats.png
 
 *.csv
 *.svg

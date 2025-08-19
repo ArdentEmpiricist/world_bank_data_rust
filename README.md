@@ -9,7 +9,7 @@
 # World Bank Data Rust 🦀📊📈
 
 <p align="center">
-  <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="enc_file Logo" width="200"/>
+  <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="world_bank_data_rust Logo" width="200"/>
 </p>
 
 Fetch, analyze, and visualize World Bank data from Rust.  
@@ -91,7 +91,7 @@ As a library (example):
 
 ```toml
 [dependencies]
-world_bank_data_rust = { path = "." } # replace with git or registry when published
+world_bank_data_rust = "0.1" # or your path
 anyhow = "1"
 ```
 
@@ -99,25 +99,37 @@ anyhow = "1"
 
 ## Quick start (CLI)
 
-Fetch population for Germany & France (2000–2023) and write to CSV (format inferred from extension):
+Fetch population for Germany & France (2000–2023), write to CSV (format inferred from extension) and show quick stats in terminal:
 
 ```bash
 world_bank_data_rust get \
-  --countries DEU;FRA \
+  --countries DEU,FRA \
   --indicators SP.POP.TOTL \
   --date 2000:2023 \
-  --out pop.csv
+  --out pop.csv \
+  --stats
 ```
 
-Render a plot (backend inferred from extension):
+Output:
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/refs/heads/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
+</p>
+
+Fetch GDP (in current US$) for the US, China, Germany and India and render a plot (backend inferred from extension):
 
 ```bash
 world_bank_data_rust get \
-  --countries DEU;FRA \
-  --indicators SP.POP.TOTL \
-  --date 2000:2023 \
-  --plot pop.svg
+  --countries USA,CHN,DEU,IND \
+  --indicators NY.GDP.MKTP.CD \
+  --date 1970:2025 \
+  --plot pop.svg \
+  --plot-kind line-points
 ```
+
+Output:
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="example plot" style='width: 90%; object-fit: contain'/>
+</p>
 
 ---
 
@@ -125,7 +137,7 @@ world_bank_data_rust get \
 
 Subcommand `get` accepts at least:
 
-- `--countries` ISO2/ISO3 codes separated by `;` or `,` (e.g., `DEU;FRA`)
+- `--countries` ISO2/ISO3 codes separated by `,` or `;` (e.g., `DEU,FRA` or (attention: `" "` are required using `;`) `"DEU;FRA"`)
 - `--indicators` World Bank indicator IDs (e.g., `SP.POP.TOTL`)
 - `--date` optional year or range (e.g., `2020` or `2000:2023`)
 - `--out <PATH>` optional export (CSV/JSON); **atomic**
@@ -168,7 +180,7 @@ The crate exposes modules for API access, models, storage, statistics, and plott
 
 ```toml
 [dependencies]
-world_bank_data_rust = { path = "." } # change to your source
+world_bank_data_rust = "0.1" # or "{ path = "." } to your source"
 anyhow = "1"
 ```
 
