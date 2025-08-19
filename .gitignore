@@ -18,6 +18,7 @@ target/
 
 !assets/logo.png
 !assets/example_plot.svg
+!assets/example_stats.png
 
 *.csv
 *.svg

@@ -103,10 +103,10 @@ Fetch population for Germany & France (2000–2023), write to CSV (format inferr
 
 ```bash
 world_bank_data_rust get \
-  --countries DEU;FRA \
+  --countries DEU,FRA \
   --indicators SP.POP.TOTL \
   --date 2000:2023 \
-  --out pop.csv
+  --out pop.csv \
   --stats
 ```
 
@@ -117,7 +117,7 @@ world_bank_data_rust get \
   --countries USA,CHN,DEU,IND \
   --indicators NY.GDP.MKTP.CD \
   --date 1970:2025 \
-  --plot pop.svg
+  --plot pop.svg \
   --plot-kind line-points
 ```
 
