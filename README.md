@@ -41,6 +41,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 - [Contributing](#contributing)
 - [Changelog (recent)](#changelog-recent)
 - [License](#license)
+- [Disclaimer](#disclaimer)
 
 ---
 
