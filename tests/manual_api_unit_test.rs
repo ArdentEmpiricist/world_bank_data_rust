@@ -42,6 +42,7 @@ fn test_api_unit_in_chart_output() {
         "Test API Unit Chart",
         viz::PlotKind::LinePoints,
         0.3,
+        None, // no country styles in tests
     ).unwrap();
 
     // Check if the SVG contains the API-provided unit

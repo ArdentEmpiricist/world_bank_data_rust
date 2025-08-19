@@ -69,6 +69,7 @@ fn plot_kinds_produce_files() {
                     "Test Chart",
                     *kind,
                     0.3,
+                    None, // no country styles in tests
                 )
                 .unwrap();
             },
@@ -99,6 +100,7 @@ fn legend_modes_produce_files() {
                     "Legend Test",
                     PlotKind::LinePoints,
                     0.3,
+                    None, // no country styles in tests
                 )
                 .unwrap();
             },
@@ -121,6 +123,7 @@ fn empty_points_is_error() {
         "Empty",
         PlotKind::Line,
         0.3,
+        None, // no country styles in tests
     );
     assert!(e.is_err());
 }

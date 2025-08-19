@@ -39,6 +39,7 @@
 //!     "Population (2010–2020)",
 //!     PlotKind::Line,
 //!     0.3, // loess_span (ignored unless PlotKind::Loess)
+//!     None, // no country styles in tests
 //! )?;
 //!
 //! // 3) Print grouped summary stats
@@ -56,6 +57,10 @@ pub mod storage;
 pub mod viz;
 pub mod viz_plotters_adapter;
 pub mod viz_style;
+
+// Feature-gated country-consistent styling module
+#[cfg(feature = "country-styles")]
+pub mod style;
 
 pub use api::Client;
 pub use models::{DataPoint, DateSpec, GroupKey};

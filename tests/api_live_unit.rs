@@ -1,6 +1,5 @@
 //! Live API test for unit preference. Run with: `cargo test --features online -- --nocapture`
 #![cfg(feature = "online")]
-//! Live API test for unit display with graceful fallback.
 //!
 //! Behavior:
 //! - If the World Bank API provides a unit for the indicator, assert that it
@@ -113,9 +112,8 @@ fn api_provided_unit_appears_in_chart_or_fallback_is_used() {
     #[cfg(not(feature = "blocking-http"))]
     let unit_opt: Option<String> = None;
 
-    // Render the chart to SVG so we can inspect text content (title/axes/legend).
-    // Replace this with a direct call to your rendering API if available.
-    let svg = render_test_chart_svg(&indicator);
+    // Read the SVG and check that it contains the API-provided unit
+    let svg_content = fs::read_to_string(&tmp_svg).unwrap();
 
     // If you can directly obtain the rendered label from the program (e.g., return values),
     // prefer asserting on that rather than parsing SVG text.

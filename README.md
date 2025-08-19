@@ -53,6 +53,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 - **Export datasets** to **CSV** or **JSON** (format inferred from `--out` extension or set via `--format`).  
   Exports are **atomic** and CSV is **spreadsheet-safe**.
 - **Export plots** as **SVG** or **PNG** (backend inferred from `--plot` file extension).
+- **Country-consistent styling** (feature-gated): when enabled, series from the same country share consistent base colors while indicators are differentiated by shades and patterns.
 
 ### Under the hood
 
@@ -131,6 +132,30 @@ Output:
   <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="example plot" style='width: 90%; object-fit: contain'/>
 </p>
 
+### Country-Consistent Styling (Feature-Gated)
+
+When compiled with the `country-styles` feature, you can enable country-consistent styling where all series for the same country share one base hue from the MS Office palette, while indicators within that country are differentiated by shades:
+
+```bash
+# Compile with country-styles feature
+cargo build --features country-styles
+
+# Use country-consistent styling
+world_bank_data_rust get \
+  --countries USA,DEU \
+  --indicators NY.GDP.MKTP.CD,SP.POP.TOTL \
+  --date 2010:2020 \
+  --plot multi_indicator.svg \
+  --plot-kind line-points \
+  --country-styles
+```
+
+This feature ensures that:
+- All series from the same country use the same base color hue
+- Different indicators within a country are differentiated by brightness variations
+- Marker shapes and line dash patterns provide additional visual distinction
+- The styling is deterministic and consistent across runs
+
 ---
 
 ## CLI usage
@@ -142,6 +167,7 @@ Subcommand `get` accepts at least:
 - `--date` optional year or range (e.g., `2020` or `2000:2023`)
 - `--out <PATH>` optional export (CSV/JSON); **atomic**
 - `--plot <PATH>` optional chart output (SVG/PNG), using Plotters
+- `--country-styles` (requires `country-styles` feature) enable country-consistent styling for multi-indicator plots
 
 ### Format inference for `--out`
 

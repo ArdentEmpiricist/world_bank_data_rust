@@ -42,6 +42,8 @@ use util::{
     map_locale, office_color,
 };
 
+
+
 use loess::loess_series;
 
 /// One-time registration for a fallback "sans-serif" font when using the `ab_glyph` text path.
@@ -77,6 +79,7 @@ pub fn plot_lines<P: AsRef<Path>>(
         "World Bank Indicator(s)",
         PlotKind::Line,
         0.3, // default LOESS span
+        None, // no country styles
     )
 }
 
@@ -98,6 +101,7 @@ pub fn plot_lines_locale<P: AsRef<Path>>(
         "World Bank Indicator(s)",
         PlotKind::Line,
         0.3,
+        None, // no country styles
     )
 }
 
@@ -120,6 +124,7 @@ pub fn plot_lines_locale_with_legend<P: AsRef<Path>>(
         "World Bank Indicator(s)",
         PlotKind::Line,
         0.3,
+        None, // no country styles
     )
 }
 
@@ -143,6 +148,7 @@ pub fn plot_lines_locale_with_legend_title<P: AsRef<Path>>(
         title,
         PlotKind::Line,
         0.3,
+        None, // no country styles
     )
 }
 
@@ -158,6 +164,7 @@ pub fn plot_chart<P: AsRef<Path>>(
     title: &str,
     kind: PlotKind,
     loess_span: f64, // fraction of neighbors (0,1], used only for PlotKind::Loess
+    country_styles: Option<bool>, // None when feature disabled, Some(bool) when enabled
 ) -> Result<()> {
     if points.is_empty() {
         return Err(anyhow!("no data to plot"));
@@ -201,13 +208,13 @@ pub fn plot_chart<P: AsRef<Path>>(
         let root = SVGBackend::new(path_string.as_str(), (width, height)).into_drawing_area();
         draw_chart(
             root, points, min_year, max_year, min_val, max_val, num_locale, legend, title, kind,
-            loess_span,
+            loess_span, country_styles,
         )?;
     } else {
         let root = BitMapBackend::new(path_string.as_str(), (width, height)).into_drawing_area();
         draw_chart(
             root, points, min_year, max_year, min_val, max_val, num_locale, legend, title, kind,
-            loess_span,
+            loess_span, country_styles,
         )?;
     }
     Ok(())
@@ -227,6 +234,7 @@ fn draw_chart<DB>(
     title: &str,
     kind: PlotKind,
     loess_span: f64,
+    country_styles: Option<bool>,
 ) -> Result<()>
 where
     DB: DrawingBackend,
@@ -476,16 +484,71 @@ where
     let mut legend_items: Vec<(String, RGBAColor)> = Vec::new();
     let inside_mode = matches!(legend, LegendMode::Inside);
 
+    // Create a flag for easier handling
+    let use_country_styles = country_styles.unwrap_or(false);
+
+    // Pre-compute unique countries for consistent ordering (if using country styles)
+    let country_list: Vec<String> = if use_country_styles {
+        let unique_countries: std::collections::BTreeSet<String> = series_list
+            .iter()
+            .map(|(iso3, _, _, _, _)| iso3.clone())
+            .collect();
+        unique_countries.into_iter().collect()
+    } else {
+        Vec::new()
+    };
+
+    // Helper function to get the appropriate color for a series
+    let get_series_color = |idx: usize, iso3: &str, indicator_id: &str| -> RGBAColor {
+        // Use country-consistent styling if enabled
+        if use_country_styles {
+            if let Some(country_index) = country_list.iter().position(|c| c == iso3) {
+                // Use the MS Office palette for base colors
+                let base_colors = [
+                    (68, 114, 196),   // blue
+                    (237, 125, 49),   // orange
+                    (165, 165, 165),  // gray
+                    (255, 192, 0),    // gold
+                    (91, 155, 213),   // light blue
+                    (112, 173, 71),   // green
+                    (38, 68, 120),    // dark blue
+                    (158, 72, 14),    // dark orange
+                    (99, 99, 99),     // dark gray
+                    (153, 115, 0),    // brownish
+                ];
+                
+                let base_color = base_colors[country_index % base_colors.len()];
+                
+                // Create brightness variation based on indicator
+                use std::collections::hash_map::DefaultHasher;
+                use std::hash::{Hash, Hasher};
+                let mut hasher = DefaultHasher::new();
+                indicator_id.hash(&mut hasher);
+                let indicator_hash = hasher.finish();
+                
+                let brightness_factor = 0.7 + 0.6 * ((indicator_hash % 100) as f64 / 100.0);
+                let adjusted_r = ((base_color.0 as f64 * brightness_factor).min(255.0).max(0.0)) as u8;
+                let adjusted_g = ((base_color.1 as f64 * brightness_factor).min(255.0).max(0.0)) as u8;
+                let adjusted_b = ((base_color.2 as f64 * brightness_factor).min(255.0).max(0.0)) as u8;
+                
+                return RGBAColor(adjusted_r, adjusted_g, adjusted_b, 1.0);
+            }
+        }
+        
+        // Default fallback: use index-based coloring
+        office_color(idx)
+    };
+
     match kind {
         PlotKind::Line
         | PlotKind::Scatter
         | PlotKind::LinePoints
         | PlotKind::Area
         | PlotKind::Loess => {
-            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+            for (idx, (iso3, indicator_id, country_label, indicator_label, series)) in
                 series_list.iter().enumerate()
             {
-                let color = office_color(idx);
+                let color = get_series_color(idx, iso3, indicator_id);
                 let base_label = make_label(country_label, indicator_label);
                 let legend_label = if matches!(kind, PlotKind::Loess) {
                     format!("{base_label} (LOESS)")
@@ -648,10 +711,10 @@ where
             let years_all: Vec<i32> = (min_year..=max_year).collect();
             let mut cum: Vec<f64> = vec![0.0; years_all.len()];
 
-            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+            for (idx, (iso3, indicator_id, country_label, indicator_label, series)) in
                 series_list.iter().enumerate()
             {
-                let color = office_color(idx);
+                let color = get_series_color(idx, iso3, indicator_id);
                 let legend_label = make_label(country_label, indicator_label);
 
                 // Map series to full year grid, missing -> 0.0
@@ -698,10 +761,10 @@ where
             let group_width = 0.8f64;
             let bar_w = group_width / n_series as f64;
 
-            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+            for (idx, (iso3, indicator_id, country_label, indicator_label, series)) in
                 series_list.iter().enumerate()
             {
-                let color = office_color(idx);
+                let color = get_series_color(idx, iso3, indicator_id);
                 let legend_label = make_label(country_label, indicator_label);
 
                 for (y, v) in series.iter() {
