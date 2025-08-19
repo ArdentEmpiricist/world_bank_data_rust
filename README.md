@@ -9,7 +9,7 @@
 # World Bank Data Rust 🦀📊📈
 
 <p align="center">
-  <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="enc_file Logo" width="200"/>
+  <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="world_bank_data_rust Logo" width="200"/>
 </p>
 
 Fetch, analyze, and visualize World Bank data from Rust.  
@@ -118,6 +118,21 @@ world_bank_data_rust get \
   --date 2000:2023 \
   --plot pop.svg
 ```
+
+Example for:
+
+```bash
+world_bank_data_rust get \
+  --countries USA,CHN,DEU,IND \
+  --indicators NY.GDP.MKTP.CD \
+  --date 1970:2025 \
+  --plot pop.svg
+  --plot-kind line-points
+```
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="enc_file Logo" width="200"/>
+</p>
 
 ---
 
