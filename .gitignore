@@ -17,6 +17,7 @@ target/
 #.idea/
 
 !.assets/logo.png
+!.assets/example_plot.svg
 
 *.csv
 *.svg
