@@ -1,4 +1,4 @@
-use world_bank_data_rust::models::DataPoint;
+use wbi_rs::models::DataPoint;
 
 /// Helper to create a DataPoint for testing
 fn make_test_datapoint(
@@ -26,28 +26,58 @@ fn make_test_datapoint(
 #[test]
 fn test_datapoint_unit_enrichment_concept() {
     // This test verifies the concept of unit enrichment that the fetch method implements
-    
+
     // Simulate DataPoints without units (as they might come from the API)
     let mut points = vec![
-        make_test_datapoint("SP.POP.TOTL", "Population, total", "DEU", 2019, Some(83000000.0), None),
-        make_test_datapoint("SP.POP.TOTL", "Population, total", "DEU", 2020, Some(83200000.0), Some("")), // empty unit
-        make_test_datapoint("NY.GDP.MKTP.CD", "GDP (current US$)", "DEU", 2019, Some(3.86e12), None),
+        make_test_datapoint(
+            "SP.POP.TOTL",
+            "Population, total",
+            "DEU",
+            2019,
+            Some(83000000.0),
+            None,
+        ),
+        make_test_datapoint(
+            "SP.POP.TOTL",
+            "Population, total",
+            "DEU",
+            2020,
+            Some(83200000.0),
+            Some(""),
+        ), // empty unit
+        make_test_datapoint(
+            "NY.GDP.MKTP.CD",
+            "GDP (current US$)",
+            "DEU",
+            2019,
+            Some(3.86e12),
+            None,
+        ),
     ];
-    
+
     // Simulate indicator metadata that would be fetched
     let mut indicator_units = std::collections::HashMap::new();
     indicator_units.insert("SP.POP.TOTL".to_string(), "Number".to_string());
-    indicator_units.insert("NY.GDP.MKTP.CD".to_string(), "Current US Dollars".to_string());
-    
+    indicator_units.insert(
+        "NY.GDP.MKTP.CD".to_string(),
+        "Current US Dollars".to_string(),
+    );
+
     // Simulate the enrichment logic from the fetch method
     for point in &mut points {
-        if point.unit.is_none() || point.unit.as_ref().map(|u| u.trim().is_empty()).unwrap_or(false) {
+        if point.unit.is_none()
+            || point
+                .unit
+                .as_ref()
+                .map(|u| u.trim().is_empty())
+                .unwrap_or(false)
+        {
             if let Some(unit) = indicator_units.get(&point.indicator_id) {
                 point.unit = Some(unit.clone());
             }
         }
     }
-    
+
     // Verify enrichment worked
     assert_eq!(points[0].unit, Some("Number".to_string()));
     assert_eq!(points[1].unit, Some("Number".to_string())); // empty string was enriched
@@ -58,22 +88,42 @@ fn test_datapoint_unit_enrichment_concept() {
 fn test_unit_enrichment_preserves_existing_units() {
     // Test that existing non-empty units are preserved
     let mut points = vec![
-        make_test_datapoint("SP.POP.TOTL", "Population, total", "DEU", 2019, Some(83000000.0), Some("People")),
-        make_test_datapoint("SP.POP.TOTL", "Population, total", "DEU", 2020, Some(83200000.0), None),
+        make_test_datapoint(
+            "SP.POP.TOTL",
+            "Population, total",
+            "DEU",
+            2019,
+            Some(83000000.0),
+            Some("People"),
+        ),
+        make_test_datapoint(
+            "SP.POP.TOTL",
+            "Population, total",
+            "DEU",
+            2020,
+            Some(83200000.0),
+            None,
+        ),
     ];
-    
+
     let mut indicator_units = std::collections::HashMap::new();
     indicator_units.insert("SP.POP.TOTL".to_string(), "Number".to_string());
-    
+
     // Simulate enrichment logic
     for point in &mut points {
-        if point.unit.is_none() || point.unit.as_ref().map(|u| u.trim().is_empty()).unwrap_or(false) {
+        if point.unit.is_none()
+            || point
+                .unit
+                .as_ref()
+                .map(|u| u.trim().is_empty())
+                .unwrap_or(false)
+        {
             if let Some(unit) = indicator_units.get(&point.indicator_id) {
                 point.unit = Some(unit.clone());
             }
         }
     }
-    
+
     // First point should keep its original unit, second should be enriched
     assert_eq!(points[0].unit, Some("People".to_string())); // preserved
     assert_eq!(points[1].unit, Some("Number".to_string())); // enriched

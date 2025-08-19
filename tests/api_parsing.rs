@@ -1,4 +1,4 @@
-use world_bank_data_rust::models::{DataPoint, Entry, Meta};
+use wbi_rs::models::{DataPoint, Entry, Meta};
 
 #[test]
 fn parse_sample_json() {

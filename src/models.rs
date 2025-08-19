@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// * `Range { start, end }` becomes `"YYYY:YYYY"`
 #[doc = "Convert to API query string (e.g., `2010:2020`)."]
 /// ```
-/// use world_bank_data_rust::models::DateSpec;
+/// use wbi_rs::models::DateSpec;
 /// assert_eq!(DateSpec::Year(2020).to_query_param(), "2020");
 /// assert_eq!(DateSpec::Range{start: 2010, end: 2020}.to_query_param(), "2010:2020");
 /// ```

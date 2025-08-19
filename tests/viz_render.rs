@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
-use world_bank_data_rust::models::DataPoint;
-use world_bank_data_rust::viz::{self, LegendMode, PlotKind};
+use wbi_rs::models::DataPoint;
+use wbi_rs::viz::{self, LegendMode, PlotKind};
 
 fn sample_points() -> Vec<DataPoint> {
     let mut out = Vec::new();

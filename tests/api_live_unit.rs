@@ -86,7 +86,7 @@ fn expected_fallback_label(indicator: &str) -> String {
 fn render_test_chart_svg(indicator: &str) -> String {
     // NOTE: Replace this stub with your crate’s actual rendering call.
     // For example:
-    // let svg = world_bank_data_rust::viz::render_svg_for_indicator(indicator, /*...*/).unwrap();
+    // let svg = wbi_rs::viz::render_svg_for_indicator(indicator, /*...*/).unwrap();
     //
     // In the meantime, keep a minimal placeholder so the test compiles if you
     // haven’t wired the helper yet. The test below will early-return if we cannot
@@ -113,7 +113,7 @@ fn api_provided_unit_appears_in_chart_or_fallback_is_used() {
     let unit_opt: Option<String> = None;
 
     // Read the SVG and check that it contains the API-provided unit
-    let svg_content = fs::read_to_string(&tmp_svg).unwrap();
+    let svg_content = render_test_chart_svg(&indicator);
 
     // If you can directly obtain the rendered label from the program (e.g., return values),
     // prefer asserting on that rather than parsing SVG text.
@@ -122,13 +122,13 @@ fn api_provided_unit_appears_in_chart_or_fallback_is_used() {
         Some(ref unit) if !unit.trim().is_empty() => {
             // Assert the unit appears somewhere in the SVG text (title/axis/legend).
             // Adjust the search as appropriate for your chart layout.
-            if svg.is_empty() {
+            if svg_content.is_empty() {
                 eprintln!(
                     "Warning: SVG text is empty. Ensure render_test_chart_svg() is wired to your renderer."
                 );
             } else {
                 assert!(
-                    svg.contains(unit),
+                    svg_content.contains(unit),
                     "Expected rendered chart to contain unit '{}', but it was not found",
                     unit
                 );
@@ -139,7 +139,7 @@ fn api_provided_unit_appears_in_chart_or_fallback_is_used() {
             // and includes a reasonable fallback label.
             let fallback = expected_fallback_label(&indicator);
 
-            if svg.is_empty() {
+            if svg_content.is_empty() {
                 eprintln!(
                     "No unit provided by API and no SVG captured; \
                      ensure render_test_chart_svg() targets the chart output location."
@@ -149,7 +149,7 @@ fn api_provided_unit_appears_in_chart_or_fallback_is_used() {
             }
 
             assert!(
-                svg.contains(&fallback),
+                svg_content.contains(&fallback),
                 "Unit missing from API; expected fallback label '{}' to appear in chart output",
                 fallback
             );

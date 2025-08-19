@@ -12,7 +12,7 @@
 ///
 /// Typical usage:
 /// ```no_run
-/// # use world_bank_data_rust::{Client, DateSpec};
+/// # use wbi_rs::{Client, DateSpec};
 /// let client = Client::default();
 /// let rows = client.fetch(
 ///     &["DEU".into()],
@@ -22,7 +22,7 @@
 /// )?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-use crate::models::{DataPoint, DateSpec, Entry, Meta, IndicatorMeta};
+use crate::models::{DataPoint, DateSpec, Entry, IndicatorMeta, Meta};
 use anyhow::{Context, Result, bail};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
 use reqwest::blocking::Client as HttpClient;
@@ -50,7 +50,7 @@ use std::time::Duration;
 ///
 /// ### Example
 /// ```no_run
-/// # use world_bank_data_rust::{Client, DateSpec};
+/// # use wbi_rs::{Client, DateSpec};
 /// let cli = Client::default();
 /// let data = cli.fetch(
 ///     &["DEU".into(), "USA".into()],
@@ -73,7 +73,7 @@ impl Default for Client {
             .timeout(Duration::from_secs(30)) // total request timeout
             .connect_timeout(Duration::from_secs(10)) // connect timeout
             .redirect(Policy::limited(5)) // cap redirects
-            .user_agent(concat!("world_bank_data_rust/", env!("CARGO_PKG_VERSION"))) // set user agent
+            .user_agent(concat!("wbi_rs/", env!("CARGO_PKG_VERSION"))) // set user agent
             .build()
             .expect("reqwest client build");
         Self {
@@ -105,14 +105,17 @@ impl Client {
     ///
     /// ### Example
     /// ```no_run
-    /// # use world_bank_data_rust::Client;
+    /// # use wbi_rs::Client;
     /// let cli = Client::default();
     /// let units = cli.fetch_indicator_units(&["SP.POP.TOTL".into()])?;
     /// # Ok::<(), anyhow::Error>(())
     /// ```
-    pub fn fetch_indicator_units(&self, indicators: &[String]) -> Result<std::collections::HashMap<String, String>> {
+    pub fn fetch_indicator_units(
+        &self,
+        indicators: &[String],
+    ) -> Result<std::collections::HashMap<String, String>> {
         use std::collections::HashMap;
-        
+
         if indicators.is_empty() {
             return Ok(HashMap::new());
         }
@@ -143,9 +146,9 @@ impl Client {
         let v: Value = get_json(&url).with_context(|| format!("GET {}", url))?;
 
         // Parse the response (same structure as data endpoint: [Meta, [IndicatorMeta, ...]])
-        let arr = v.as_array().ok_or_else(|| {
-            anyhow::anyhow!("unexpected response shape: not a top-level array")
-        })?;
+        let arr = v
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("unexpected response shape: not a top-level array"))?;
         if arr.is_empty() {
             bail!("unexpected response: empty array");
         }
@@ -268,15 +271,27 @@ impl Client {
         }
 
         // Unit enrichment: if any DataPoints lack units, try to fetch from indicator metadata
-        let needs_enrichment = out.iter().any(|p| p.unit.is_none() || p.unit.as_ref().map(|u| u.trim().is_empty()).unwrap_or(false));
-        
+        let needs_enrichment = out.iter().any(|p| {
+            p.unit.is_none()
+                || p.unit
+                    .as_ref()
+                    .map(|u| u.trim().is_empty())
+                    .unwrap_or(false)
+        });
+
         if needs_enrichment {
             // Fetch indicator metadata to get units
             match self.fetch_indicator_units(indicators) {
                 Ok(indicator_units) => {
                     // Enrich DataPoints that lack units
                     for point in &mut out {
-                        if point.unit.is_none() || point.unit.as_ref().map(|u| u.trim().is_empty()).unwrap_or(false) {
+                        if point.unit.is_none()
+                            || point
+                                .unit
+                                .as_ref()
+                                .map(|u| u.trim().is_empty())
+                                .unwrap_or(false)
+                        {
                             if let Some(unit) = indicator_units.get(&point.indicator_id) {
                                 point.unit = Some(unit.clone());
                             }

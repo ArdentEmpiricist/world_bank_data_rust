@@ -1,9 +1,9 @@
 
-[![Crates.io](https://img.shields.io/crates/v/world_bank_data_rust?label=Crates.io)](https://crates.io/crates/world_bank_data_rust)
+[![Crates.io](https://img.shields.io/crates/v/wbi-rs?label=Crates.io)](https://crates.io/crates/wbi-rs)
 [![rust-clippy analyze](https://img.shields.io/github/actions/workflow/status/ardentempiricist/world_bank_data_rust/rust-clippy.yml?label=Rust%20Clippy)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/rust-clippy.yml)
 [![Deploy](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml)
-[![Documentation](https://docs.rs/world_bank_data_rust/badge.svg)](https://docs.rs/world_bank_data_rust/)
-[![Crates.io](https://img.shields.io/crates/d/world_bank_data_rust?color=darkblue&label=Downloads)](https://crates.io/crates/world_bank_data_rust)
+[![Documentation](https://docs.rs/wbi-rs/badge.svg)](https://docs.rs/wbi-rs/)
+[![Crates.io](https://img.shields.io/crates/d/wbi-rs?color=darkblue&label=Downloads)](https://crates.io/crates/wbi-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 # World Bank Data Rust 🦀📊📈
@@ -57,7 +57,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 
 ### Under the hood
 
-- **Hardened HTTPS client** (rustls, connect/request timeouts, limited redirects, descriptive `User-Agent`: `world_bank_data_rust`).
+- **Hardened HTTPS client** (rustls, connect/request timeouts, limited redirects, descriptive `User-Agent`: `wbi_rs`).
 - **Robust URL handling**
 - **Transient error resilience** (small retry/backoff) and **page caps**.
 - **Valid JSON** under all inputs (`NaN`/`±∞` → `null`).
@@ -76,8 +76,8 @@ Download a prebuilt binary (GitHub Releases):
 Via cargo/crates.io:
 
 ```bash
-cargo install world_bank_data_rust
-world_bank_data_rust --help
+cargo install wbi-rs
+wbi --help
 ```
 
 From source:
@@ -92,7 +92,7 @@ As a library (example):
 
 ```toml
 [dependencies]
-world_bank_data_rust = "0.1" # or your path
+wbi-rs = "0.1" # or your path
 anyhow = "1"
 ```
 
@@ -103,7 +103,7 @@ anyhow = "1"
 Fetch population for Germany & France (2000–2023), write to CSV (format inferred from extension) and show quick stats in terminal:
 
 ```bash
-world_bank_data_rust get \
+wbi get \
   --countries DEU,FRA \
   --indicators SP.POP.TOTL \
   --date 2000:2023 \
@@ -119,7 +119,7 @@ Output:
 Fetch GDP (in current US$) for the US, China, Germany and India and render a plot (backend inferred from extension):
 
 ```bash
-world_bank_data_rust get \
+wbi get \
   --countries USA,CHN,DEU,IND \
   --indicators NY.GDP.MKTP.CD \
   --date 1970:2025 \
@@ -141,7 +141,7 @@ When compiled with the `country-styles` feature, you can enable country-consiste
 cargo build --features country-styles
 
 # Use country-consistent styling
-world_bank_data_rust get \
+wbi get \
   --countries USA,DEU \
   --indicators NY.GDP.MKTP.CD,SP.POP.TOTL \
   --date 2010:2020 \
@@ -184,16 +184,16 @@ Subcommand `get` accepts at least:
 
 ```bash
 # CSV via extension inference
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.csv
+wbi get --countries DEU --indicators SP.POP.TOTL --out data.csv
 
 # JSON via extension inference
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.json
+wbi get --countries DEU --indicators SP.POP.TOTL --out data.json
 
 # Unknown extension allowed when --format is explicit
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out dump.xyz --format csv
+wbi get --countries DEU --indicators SP.POP.TOTL --out dump.xyz --format csv
 
 # Error on conflict
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.csv --format json
+wbi get --countries DEU --indicators SP.POP.TOTL --out data.csv --format json
 ```
 
 ---
@@ -206,7 +206,7 @@ The crate exposes modules for API access, models, storage, statistics, and plott
 
 ```toml
 [dependencies]
-world_bank_data_rust = "0.1" # or "{ path = "." } to your source"
+wbi-rs = "0.1" # or "{ path = "." } to your source"
 anyhow = "1"
 ```
 
@@ -214,8 +214,8 @@ anyhow = "1"
 
 ```rust
 use anyhow::Result;
-use world_bank_data_rust::api::Client;
-use world_bank_data_rust::models::DateSpec;
+use wbi_rs::api::Client;
+use wbi_rs::models::DateSpec;
 
 fn main() -> Result<()> {
     // Hardened blocking client (rustls, timeouts, redirect policy, UA)
@@ -246,7 +246,7 @@ let units = api.fetch_indicator_units(&["SP.POP.TOTL".into(), "NY.GDP.MKTP.CD".i
 ### Export data (atomic CSV/JSON)
 
 ```rust
-use world_bank_data_rust::storage::{save_csv, save_json};
+use wbi_rs::storage::{save_csv, save_json};
 
 save_csv(&points, "pop.csv")?;   // spreadsheet-safe + atomic
 save_json(&points, "pop.json")?; // non-finite -> null + atomic
@@ -260,7 +260,7 @@ Both writers use a tempfile in the destination directory and atomically replace 
 ### Compute grouped summaries
 
 ```rust
-use world_bank_data_rust::stats::{grouped_summary, Summary};
+use wbi_rs::stats::{grouped_summary, Summary};
 
 let summaries: Vec<Summary> = grouped_summary(&points);
 // Summary contains: key (indicator_id, country_iso3), count, missing, min, max, mean, median.
@@ -270,7 +270,7 @@ let summaries: Vec<Summary> = grouped_summary(&points);
 ### Plot charts
 
 ```rust
-use world_bank_data_rust::viz::plot_chart;
+use wbi_rs::viz::plot_chart;
 
 // `plot_chart` filters non-finite values and sorts by integer year.
 // The backend is selected from the output extension (.svg, .png).

@@ -1,4 +1,4 @@
-use world_bank_data_rust::models::{DataPoint, Entry, Meta, IndicatorMeta};
+use wbi_rs::models::{DataPoint, Entry, IndicatorMeta, Meta};
 
 #[test]
 fn meta_per_page_accepts_string_or_number() {
@@ -85,7 +85,7 @@ fn indicator_meta_handles_missing_unit() {
 
 #[test]
 fn fetch_indicator_units_returns_empty_for_empty_input() {
-    use world_bank_data_rust::Client;
+    use wbi_rs::Client;
     let client = Client::default();
     let result = client.fetch_indicator_units(&[]).unwrap();
     assert!(result.is_empty());
