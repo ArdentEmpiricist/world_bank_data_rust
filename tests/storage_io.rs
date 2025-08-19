@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
-use world_bank_data_rust::models::DataPoint;
-use world_bank_data_rust::storage;
+use wbi_rs::models::DataPoint;
+use wbi_rs::storage;
 
 fn sample(n: usize) -> Vec<DataPoint> {
     (0..n)

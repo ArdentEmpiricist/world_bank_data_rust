@@ -1,5 +1,5 @@
-use world_bank_data_rust::models::{DataPoint, GroupKey};
-use world_bank_data_rust::stats::grouped_summary;
+use wbi_rs::models::{DataPoint, GroupKey};
+use wbi_rs::stats::grouped_summary;
 
 fn dp(ind_id: &str, c_iso3: &str, year: i32, v: Option<f64>) -> DataPoint {
     DataPoint {
@@ -30,10 +30,16 @@ fn grouped_stats_handle_missing_and_median_even_odd() {
         dp("IND1", "BBB", 2020, Some(30.0)),
     ];
     let mut got = grouped_summary(&rows);
-    got.sort_by(|a,b| a.key.cmp(&b.key));
+    got.sort_by(|a, b| a.key.cmp(&b.key));
 
     let a = &got[0];
-    assert_eq!(a.key, GroupKey { indicator_id: "IND1".into(), country_iso3: "AAA".into() });
+    assert_eq!(
+        a.key,
+        GroupKey {
+            indicator_id: "IND1".into(),
+            country_iso3: "AAA".into()
+        }
+    );
     assert_eq!(a.count, 4);
     assert_eq!(a.missing, 0);
     assert_eq!(a.min, Some(1.0));
@@ -42,7 +48,13 @@ fn grouped_stats_handle_missing_and_median_even_odd() {
     assert!((a.median.unwrap() - 2.5).abs() < 1e-9);
 
     let b = &got[1];
-    assert_eq!(b.key, GroupKey { indicator_id: "IND1".into(), country_iso3: "BBB".into() });
+    assert_eq!(
+        b.key,
+        GroupKey {
+            indicator_id: "IND1".into(),
+            country_iso3: "BBB".into()
+        }
+    );
     assert_eq!(b.count, 2);
     assert_eq!(b.missing, 1);
     assert_eq!(b.min, Some(10.0));

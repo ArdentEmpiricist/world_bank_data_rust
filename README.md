@@ -1,15 +1,15 @@
 
-[![Crates.io](https://img.shields.io/crates/v/world_bank_data_rust?label=Crates.io)](https://crates.io/crates/world_bank_data_rust)
-[![rust-clippy analyze](https://img.shields.io/github/actions/workflow/status/ardentempiricist/world_bank_data_rust/rust-clippy.yml?label=Rust%20Clippy)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/rust-clippy.yml)
-[![Deploy](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArdentEmpiricist/world_bank_data_rust/actions/workflows/deploy.yml)
-[![Documentation](https://docs.rs/world_bank_data_rust/badge.svg)](https://docs.rs/world_bank_data_rust/)
-[![Crates.io](https://img.shields.io/crates/d/world_bank_data_rust?color=darkblue&label=Downloads)](https://crates.io/crates/world_bank_data_rust)
+[![Crates.io](https://img.shields.io/crates/v/wbi-rs?label=Crates.io)](https://crates.io/crates/wbi-rs)
+[![rust-clippy analyze](https://img.shields.io/github/actions/workflow/status/ardentempiricist/wbi-rs/rust-clippy.yml?label=Rust%20Clippy)](https://github.com/ArdentEmpiricist/wbi-rs/actions/workflows/rust-clippy.yml)
+[![Deploy](https://github.com/ArdentEmpiricist/wbi-rs/actions/workflows/deploy.yml/badge.svg)](https://github.com/ArdentEmpiricist/wbi-rs/actions/workflows/deploy.yml)
+[![Documentation](https://docs.rs/wbi-rs/badge.svg)](https://docs.rs/wbi-rs/)
+[![Crates.io](https://img.shields.io/crates/d/wbi-rs?color=darkblue&label=Downloads)](https://crates.io/crates/wbi-rs)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-# World Bank Data Rust 🦀📊📈
+# wbi-rs 🦀📊📈
 
 <p align="center">
-  <img src="https://github.com/ArdentEmpiricist/world_bank_data_rust/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="world_bank_data_rust Logo" width="200"/>
+  <img src="https://github.com/ArdentEmpiricist/wbi-rs/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="wbi-rs Logo" width="200"/>
 </p>
 
 Fetch, analyze, and visualize World Bank data from Rust.  
@@ -53,10 +53,11 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 - **Export datasets** to **CSV** or **JSON** (format inferred from `--out` extension or set via `--format`).  
   Exports are **atomic** and CSV is **spreadsheet-safe**.
 - **Export plots** as **SVG** or **PNG** (backend inferred from `--plot` file extension).
+- **Country-consistent styling** (feature-gated): when enabled, series from the same country share consistent base colors while indicators are differentiated by shades and patterns.
 
 ### Under the hood
 
-- **Hardened HTTPS client** (rustls, connect/request timeouts, limited redirects, descriptive `User-Agent`: `world_bank_data_rust`).
+- **Hardened HTTPS client** (rustls, connect/request timeouts, limited redirects, descriptive `User-Agent`: `wbi_rs`).
 - **Robust URL handling**
 - **Transient error resilience** (small retry/backoff) and **page caps**.
 - **Valid JSON** under all inputs (`NaN`/`±∞` → `null`).
@@ -69,21 +70,21 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 
 Download a prebuilt binary (GitHub Releases):
 
-1) Go to **GitHub → Releases**: [https://github.com/ArdentEmpiricist/world_bank_data_rust/releases/new](https://github.com/ArdentEmpiricist/world_bank_data_rust/releases/new)
+1) Go to **GitHub → Releases**: [https://github.com/ArdentEmpiricist/wbi-rs/releases/new](https://github.com/ArdentEmpiricist/wbi-rs/releases/new)
 2) Download the asset for your platform
 
 Via cargo/crates.io:
 
 ```bash
-cargo install world_bank_data_rust
-world_bank_data_rust --help
+cargo install wbi-rs
+wbi --help
 ```
 
 From source:
 
 ```bash
 git clone <this-repo>
-cd world_bank_data_rust
+cd wbi-rs
 cargo build --release
 ```
 
@@ -91,7 +92,7 @@ As a library (example):
 
 ```toml
 [dependencies]
-world_bank_data_rust = "0.1" # or your path
+wbi-rs = "0.1" # or your path
 anyhow = "1"
 ```
 
@@ -102,7 +103,7 @@ anyhow = "1"
 Fetch population for Germany & France (2000–2023), write to CSV (format inferred from extension) and show quick stats in terminal:
 
 ```bash
-world_bank_data_rust get \
+wbi get \
   --countries DEU,FRA \
   --indicators SP.POP.TOTL \
   --date 2000:2023 \
@@ -112,13 +113,13 @@ world_bank_data_rust get \
 
 Output:
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/refs/heads/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/refs/heads/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
 </p>
 
 Fetch GDP (in current US$) for the US, China, Germany and India and render a plot (backend inferred from extension):
 
 ```bash
-world_bank_data_rust get \
+wbi get \
   --countries USA,CHN,DEU,IND \
   --indicators NY.GDP.MKTP.CD \
   --date 1970:2025 \
@@ -128,8 +129,32 @@ world_bank_data_rust get \
 
 Output:
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/world_bank_data_rust/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="example plot" style='width: 90%; object-fit: contain'/>
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="example plot" style='width: 90%; object-fit: contain'/>
 </p>
+
+### Country-Consistent Styling (Feature-Gated)
+
+When compiled with the `country-styles` feature, you can enable country-consistent styling where all series for the same country share one base hue from the MS Office palette, while indicators within that country are differentiated by shades:
+
+```bash
+# Compile with country-styles feature
+cargo build --features country-styles
+
+# Use country-consistent styling
+wbi get \
+  --countries USA,DEU \
+  --indicators NY.GDP.MKTP.CD,SP.POP.TOTL \
+  --date 2010:2020 \
+  --plot multi_indicator.svg \
+  --plot-kind line-points \
+  --country-styles
+```
+
+This feature ensures that:
+- All series from the same country use the same base color hue
+- Different indicators within a country are differentiated by brightness variations
+- Marker shapes and line dash patterns provide additional visual distinction
+- The styling is deterministic and consistent across runs
 
 ---
 
@@ -142,6 +167,7 @@ Subcommand `get` accepts at least:
 - `--date` optional year or range (e.g., `2020` or `2000:2023`)
 - `--out <PATH>` optional export (CSV/JSON); **atomic**
 - `--plot <PATH>` optional chart output (SVG/PNG), using Plotters
+- `--country-styles` (requires `country-styles` feature) enable country-consistent styling for multi-indicator plots
 
 ### Format inference for `--out`
 
@@ -158,16 +184,16 @@ Subcommand `get` accepts at least:
 
 ```bash
 # CSV via extension inference
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.csv
+wbi get --countries DEU --indicators SP.POP.TOTL --out data.csv
 
 # JSON via extension inference
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.json
+wbi get --countries DEU --indicators SP.POP.TOTL --out data.json
 
 # Unknown extension allowed when --format is explicit
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out dump.xyz --format csv
+wbi get --countries DEU --indicators SP.POP.TOTL --out dump.xyz --format csv
 
 # Error on conflict
-world_bank_data_rust get --countries DEU --indicators SP.POP.TOTL --out data.csv --format json
+wbi get --countries DEU --indicators SP.POP.TOTL --out data.csv --format json
 ```
 
 ---
@@ -180,7 +206,7 @@ The crate exposes modules for API access, models, storage, statistics, and plott
 
 ```toml
 [dependencies]
-world_bank_data_rust = "0.1" # or "{ path = "." } to your source"
+wbi-rs = "0.1" # or "{ path = "." } to your source"
 anyhow = "1"
 ```
 
@@ -188,8 +214,8 @@ anyhow = "1"
 
 ```rust
 use anyhow::Result;
-use world_bank_data_rust::api::Client;
-use world_bank_data_rust::models::DateSpec;
+use wbi_rs::api::Client;
+use wbi_rs::models::DateSpec;
 
 fn main() -> Result<()> {
     // Hardened blocking client (rustls, timeouts, redirect policy, UA)
@@ -208,10 +234,19 @@ fn main() -> Result<()> {
 }
 ```
 
+The `fetch` method automatically enriches `DataPoint.unit` values when observation rows lack a unit by fetching metadata from the World Bank indicator endpoint. This ensures that visualization and analysis code has access to appropriate unit information for axis labeling and scaling decisions.
+
+If you need to manually fetch indicator units for specific indicators:
+
+```rust
+let units = api.fetch_indicator_units(&["SP.POP.TOTL".into(), "NY.GDP.MKTP.CD".into()])?;
+// Returns HashMap<String, String> mapping indicator ID to unit
+```
+
 ### Export data (atomic CSV/JSON)
 
 ```rust
-use world_bank_data_rust::storage::{save_csv, save_json};
+use wbi_rs::storage::{save_csv, save_json};
 
 save_csv(&points, "pop.csv")?;   // spreadsheet-safe + atomic
 save_json(&points, "pop.json")?; // non-finite -> null + atomic
@@ -225,7 +260,7 @@ Both writers use a tempfile in the destination directory and atomically replace 
 ### Compute grouped summaries
 
 ```rust
-use world_bank_data_rust::stats::{grouped_summary, Summary};
+use wbi_rs::stats::{grouped_summary, Summary};
 
 let summaries: Vec<Summary> = grouped_summary(&points);
 // Summary contains: key (indicator_id, country_iso3), count, missing, min, max, mean, median.
@@ -235,12 +270,18 @@ let summaries: Vec<Summary> = grouped_summary(&points);
 ### Plot charts
 
 ```rust
-use world_bank_data_rust::viz::plot_chart;
+use wbi_rs::viz::plot_chart;
 
 // `plot_chart` filters non-finite values and sorts by integer year.
 // The backend is selected from the output extension (.svg, .png).
 plot_chart(&points, "pop.svg")?;
 ```
+
+Charts automatically derive appropriate units for axis labeling using a two-tier approach:
+1. **Prefer units from DataPoint.unit**: When all points have the same non-empty unit, use it directly for axis labeling
+2. **Fallback to indicator name parsing**: For single-indicator plots without consistent units, extract unit information from parentheses in the indicator name (e.g., "GDP (current US$)" → "current US$")
+
+This approach ensures that both API-provided units and legacy indicator naming conventions are properly handled for visualization.
 
 ### Data model
 

@@ -2,12 +2,12 @@ use anyhow::{Result, bail};
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use num_format::{Locale, ToFormattedString};
 use std::path::{Path, PathBuf};
-use world_bank_data_rust::{Client, DateSpec};
-use world_bank_data_rust::{stats, storage, viz};
+use wbi_rs::{Client, DateSpec};
+use wbi_rs::{stats, storage, viz};
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "world_bank_data_rust",
+    name = "wbi",
     version,
     about = "Fetch, store, visualize & summarize World Bank indicators"
 )]
@@ -95,6 +95,10 @@ struct GetArgs {
     /// LOESS span in (0,1]; fraction of neighbors used (only for --plot-kind loess)
     #[arg(long = "loess-span", default_value_t = 0.3, value_parser = parse_loess_span)]
     loess_span: f64,
+    /// Enable country-consistent styling (requires country-styles feature)
+    #[cfg(feature = "country-styles")]
+    #[arg(long = "country-styles", default_value_t = false)]
+    country_styles: bool,
 }
 
 fn parse_list(s: &str) -> Vec<String> {
@@ -257,6 +261,16 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             title,
             plot_kind,
             args.loess_span,
+            {
+                #[cfg(feature = "country-styles")]
+                {
+                    Some(args.country_styles)
+                }
+                #[cfg(not(feature = "country-styles"))]
+                {
+                    None
+                }
+            },
         )?;
         eprintln!("Wrote plot to {}", plot_path.display());
     }

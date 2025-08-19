@@ -1,7 +1,7 @@
-use world_bank_data_rust::models::DataPoint;
-use world_bank_data_rust::viz::{self, LegendMode, PlotKind};
 use std::fs;
 use std::path::PathBuf;
+use wbi_rs::models::DataPoint;
+use wbi_rs::viz::{self, LegendMode, PlotKind};
 
 fn sample_points() -> Vec<DataPoint> {
     let mut out = Vec::new();
@@ -15,7 +15,9 @@ fn sample_points() -> Vec<DataPoint> {
             country_iso3: "DEU".into(),
             year: y,
             value: Some(v),
-            unit: None, obs_status: None, decimal: None,
+            unit: None,
+            obs_status: None,
+            decimal: None,
         });
     }
     // Series 2: USA
@@ -28,7 +30,9 @@ fn sample_points() -> Vec<DataPoint> {
             country_iso3: "USA".into(),
             year: y,
             value: Some(v),
-            unit: None, obs_status: None, decimal: None,
+            unit: None,
+            obs_status: None,
+            decimal: None,
         });
     }
     out
@@ -53,20 +57,55 @@ fn plot_kinds_produce_files() {
         PlotKind::Area,
     ];
     for (i, kind) in kinds.iter().enumerate() {
-        write_and_check(|p| {
-            viz::plot_chart(&points, p, 800, 480, "en", LegendMode::Right, "Test Chart", *kind, 0.3).unwrap();
-        }, &format!("kind{}", i));
+        write_and_check(
+            |p| {
+                viz::plot_chart(
+                    &points,
+                    p,
+                    800,
+                    480,
+                    "en",
+                    LegendMode::Right,
+                    "Test Chart",
+                    *kind,
+                    0.3,
+                    None, // no country styles in tests
+                )
+                .unwrap();
+            },
+            &format!("kind{}", i),
+        );
     }
 }
 
 #[test]
 fn legend_modes_produce_files() {
     let points = sample_points();
-    let modes = [LegendMode::Inside, LegendMode::Right, LegendMode::Top, LegendMode::Bottom];
+    let modes = [
+        LegendMode::Inside,
+        LegendMode::Right,
+        LegendMode::Top,
+        LegendMode::Bottom,
+    ];
     for (i, mode) in modes.iter().enumerate() {
-        write_and_check(|p| {
-            viz::plot_chart(&points, p, 800, 480, "en", *mode, "Legend Test", PlotKind::LinePoints, 0.3).unwrap();
-        }, &format!("legend{}", i));
+        write_and_check(
+            |p| {
+                viz::plot_chart(
+                    &points,
+                    p,
+                    800,
+                    480,
+                    "en",
+                    *mode,
+                    "Legend Test",
+                    PlotKind::LinePoints,
+                    0.3,
+                    None, // no country styles in tests
+                )
+                .unwrap();
+            },
+            &format!("legend{}", i),
+        );
     }
 }
 
@@ -74,6 +113,17 @@ fn legend_modes_produce_files() {
 fn empty_points_is_error() {
     let points: Vec<DataPoint> = vec![];
     let tmp = std::env::temp_dir().join("wbd_viz_empty.svg");
-    let e = viz::plot_chart(&points, &tmp, 800, 480, "en", LegendMode::Right, "Empty", PlotKind::Line, 0.3);
+    let e = viz::plot_chart(
+        &points,
+        &tmp,
+        800,
+        480,
+        "en",
+        LegendMode::Right,
+        "Empty",
+        PlotKind::Line,
+        0.3,
+        None, // no country styles in tests
+    );
     assert!(e.is_err());
 }
