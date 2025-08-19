@@ -9,7 +9,7 @@
 # wbi-rs 🦀📊📈
 
 <p align="center">
-  <img src="https://github.com/ArdentEmpiricist/wbi-rs/blob/ef373fcdc6df6fd731400b81ace3af62795edea7/assets/logo.png?raw=true" alt="wbi-rs Logo" width="200"/>
+  <img src="https://github.com/ArdentEmpiricist/wbi-rs/blob/main/assets/logo.png?raw=true" alt="wbi-rs Logo" width="200"/>
 </p>
 
 Fetch, analyze, and visualize World Bank data from Rust.  
@@ -114,7 +114,7 @@ wbi get \
 
 Output:
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/refs/heads/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
+  <img src="https://github.com/ArdentEmpiricist/wbi-rs/blob/main/assets/example_stats.png?raw=true" alt="example terminal output" style='width: 90%; object-fit: contain'/>
 </p>
 
 Fetch GDP (in current US$) for the US, China, Germany and India and render a plot (backend inferred from extension):
@@ -130,7 +130,7 @@ wbi get \
 
 Output:
 <p align="center">
-  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/f35a19f1f333c5d88e2299073fba367ef56880e7/assets/example_plot.svg?raw=true" alt="example plot" style='width: 90%; object-fit: contain'/>
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/bf42ecfa7f9a4a559b886aa5bf48d397fb41233d/assets/example_plot.svg" alt="example plot" style='width: 90%; object-fit: contain'/>
 </p>
 
 ### Country-Consistent Styling (Feature-Gated)
