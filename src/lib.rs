@@ -54,6 +54,8 @@ pub mod models;
 pub mod stats;
 pub mod storage;
 pub mod viz;
+pub mod viz_plotters_adapter;
+pub mod viz_style;
 
 pub use api::Client;
 pub use models::{DataPoint, DateSpec, GroupKey};

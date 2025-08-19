@@ -1,6 +1,6 @@
 //! Visualization utilities: render multi-series charts to **SVG** or **PNG**.
 //!
-//! - Distinct series colors (Microsoft Office palette)
+//! - Distinct, stable series styling: country-colored + indicator marker shapes
 //! - Locale-aware tick labels (`30,000` vs `30.000`), whole numbers
 //! - Legend placement: `Inside`, `Right`, `Top`, `Bottom` (non-overlapping for external legends)
 //! - Plot kinds: `Line`, `Scatter`, `LinePoints`, `Area`, `StackedArea`, `GroupedBar`, `Loess`
@@ -75,6 +75,10 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use std::sync::Once;
+
+// NEW: styling adapters and series style
+use crate::viz_plotters_adapter::{fill_style, line_style, make_marker, rgb_color};
+use crate::viz_style::SeriesStyle;
 
 /// One-time registration for a fallback "sans-serif" font when using the `ab_glyph` text path.
 /// Required because `ab_glyph` doesn't discover OS fonts.
@@ -178,26 +182,6 @@ pub enum PlotKind {
     GroupedBar,
     /// LOESS smoothed line (span parameter controls smoothness).
     Loess,
-}
-
-/// Microsoft Office (2013+) chart series palette.
-/// Order: Blue, Orange, Gray, Gold, Light Blue, Green, Dark Blue, Dark Orange, Dark Gray, Brownish Gold.
-const OFFICE10: [RGBColor; 10] = [
-    RGBColor(68, 114, 196),  // blue      (#4472C4)
-    RGBColor(237, 125, 49),  // orange    (#ED7D31)
-    RGBColor(165, 165, 165), // gray      (#A5A5A5)
-    RGBColor(255, 192, 0),   // gold      (#FFC000)
-    RGBColor(91, 155, 213),  // light blue(#5B9BD5)
-    RGBColor(112, 173, 71),  // green     (#70AD47)
-    RGBColor(38, 68, 120),   // dark blue (#264478)
-    RGBColor(158, 72, 14),   // dark org. (#9E480E)
-    RGBColor(99, 99, 99),    // dark gray (#636363)
-    RGBColor(153, 115, 0),   // brownish  (#997300)
-];
-
-#[inline]
-fn office_color(idx: usize) -> RGBAColor {
-    OFFICE10[idx % OFFICE10.len()].to_rgba()
 }
 
 /// Pick a single Y-axis scale and its human label based on the overall magnitude.
@@ -332,7 +316,7 @@ fn estimate_top_bottom_legend_height_px(
 
     // Pass 1: Greedy pack into rows to determine how many columns (K)
     let mut rows: Vec<Vec<String>> = Vec::new();
-    let mut cur: Vec<String> = Vec::new();
+    let mut cur = Vec::new();
     let mut x = start_x;
 
     let per_item_cap_px: i32 = ((usable_row_w - start_x) as f32 * 0.35).max(140.0) as i32;
@@ -546,6 +530,10 @@ pub fn plot_chart<P: AsRef<Path>>(
     ensure_fonts_registered();
     let out_path = out_path.as_ref();
     let path_string = out_path.to_string_lossy().into_owned();
+    // Backend constructors sometimes require a 'static str reference that outlives this function.
+    // Convert the owned String into a leaked &'static str so the backend can safely store it.
+    // Note: this intentionally leaks a small amount of memory for the lifetime of the program.
+    let path_static: &'static str = Box::leak(path_string.into_boxed_str());
 
     let years: Vec<i32> = points.iter().map(|p| p.year).filter(|y| *y != 0).collect();
     let (mut min_year, mut max_year) = (
@@ -576,21 +564,23 @@ pub fn plot_chart<P: AsRef<Path>>(
         max_val += 1.0;
     }
 
+    // Map locale tag to a num_format::Locale used by draw_chart
     let (num_locale, _dec_sep) = map_locale(locale_tag);
 
     if out_path.extension().and_then(|s| s.to_str()) == Some("svg") {
-        let root = SVGBackend::new(path_string.as_str(), (width, height)).into_drawing_area();
+        let root = SVGBackend::new(path_static, (width, height)).into_drawing_area();
         draw_chart(
             root, points, min_year, max_year, min_val, max_val, num_locale, legend, title, kind,
             loess_span,
         )?;
     } else {
-        let root = BitMapBackend::new(path_string.as_str(), (width, height)).into_drawing_area();
+        let root = BitMapBackend::new(path_static, (width, height)).into_drawing_area();
         draw_chart(
             root, points, min_year, max_year, min_val, max_val, num_locale, legend, title, kind,
             loess_span,
         )?;
     }
+
     Ok(())
 }
 
@@ -933,48 +923,39 @@ fn draw_chart<DB>(
     max_year: i32,
     min_val: f64,
     max_val: f64,
-    num_locale: &num_format::Locale,
+    _num_locale: &num_format::Locale,
     legend: LegendMode,
     title: &str,
     kind: PlotKind,
     loess_span: f64,
 ) -> anyhow::Result<()>
 where
-    DB: DrawingBackend,
+    DB: DrawingBackend + 'static,
 {
-    // ----------------------------
-    // 0) Common constants
-    // ----------------------------
-    const MARGIN: i32 = 16; // matches .margin(16) below
+    const MARGIN: i32 = 16;
     let x_min = min_year as f64;
     let x_max = max_year as f64;
 
-    // Axis scaling for large magnitudes (thousands/millions/billions/…)
-    // Derive a unit from the indicator metadata/name, then decide scaling.
-    // Percent-like units are NOT scaled; currencies/counts can be scaled to thousands/millions/…
-    let base_unit = derive_axis_unit(points); // e.g., "current US$" or "annual %"
+    // Axis unit/scaling
+    let base_unit = derive_axis_unit(points);
     let max_abs = min_val.abs().max(max_val.abs());
-
     let (yscale, scale_word) = if let Some(ref unit) = base_unit {
         if is_percentage_like(unit) {
-            (1.0, "") // do not scale percentages
+            (1.0, "")
         } else {
-            choose_axis_scale(max_abs) // e.g., (1e6, "millions")
+            choose_axis_scale(max_abs)
         }
     } else {
-        // Mixed indicators or no unit => fall back to generic scaling
         choose_axis_scale(max_abs)
     };
-
-    // This is the final Y-axis title
     let y_axis_title = match (base_unit.as_deref(), scale_word) {
-        (Some(u), "") => u.to_string(),         // e.g., "annual %"
-        (Some(u), sw) => format!("{u} ({sw})"), // e.g., "current US$ (millions)"
+        (Some(u), "") => u.to_string(),
+        (Some(u), sw) => format!("{u} ({sw})"),
         (None, "") => "Value".to_string(),
         (None, sw) => format!("Value ({sw})"),
     };
 
-    // X/Y tick formatters
+    // Formatters and label counts
     let x_label_fmt = |x: &f64| (x.round() as i32).to_string();
     let y_label_fmt_scaled = |v: &f64| {
         let a = v.abs();
@@ -990,11 +971,8 @@ where
     let x_label_count = ((max_year - min_year + 1) as usize).min(12);
     let y_label_count = 10usize;
 
-    // ----------------------------
-    // 1) Build name maps & groups
-    // ----------------------------
+    // Collect names and group data
     use std::collections::{BTreeMap, BTreeSet, HashMap};
-
     let mut indicator_name_by_id: HashMap<String, String> = HashMap::new();
     let mut country_name_by_iso3: HashMap<String, String> = HashMap::new();
     for p in points {
@@ -1006,7 +984,6 @@ where
             .or_insert_with(|| p.country_name.clone());
     }
 
-    // Group as (ISO3, indicator_id) -> Vec<(year, value)>
     let mut groups: BTreeMap<(String, String), Vec<(i32, f64)>> = BTreeMap::new();
     for p in points {
         if let (y, Some(v)) = (p.year, p.value) {
@@ -1018,11 +995,10 @@ where
             }
         }
     }
-    for ((_country, _indicator), series) in groups.iter_mut() {
+    for series in groups.values_mut() {
         series.sort_by_key(|(y, _)| *y);
     }
 
-    // Sorted list by *country name* then *indicator name*
     let mut series_list: Vec<(String, String, String, String, Vec<(i32, f64)>)> = Vec::new();
     for ((iso3, indicator_id), series) in groups.iter() {
         let country_label = country_name_by_iso3
@@ -1043,16 +1019,12 @@ where
     }
     series_list.sort_by(|a, b| a.2.cmp(&b.2).then(a.3.cmp(&b.3)));
 
-    // Shorter legend labels when possible:
-    // - one indicator across many countries → label = country name only
-    // - one country across many indicators → label = indicator name only
-    // - both vary → "Country — Indicator"
+    // Legend label heuristic
     let unique_indicators: BTreeSet<&str> =
         points.iter().map(|p| p.indicator_id.as_str()).collect();
     let unique_countries: BTreeSet<&str> = points.iter().map(|p| p.country_iso3.as_str()).collect();
     let one_indicator = unique_indicators.len() == 1;
     let one_country = unique_countries.len() == 1;
-
     let make_label = |country_label: &str, indicator_label: &str| -> String {
         if one_indicator && !one_country {
             country_label.to_string()
@@ -1063,50 +1035,27 @@ where
         }
     };
 
-    // ----------------------------
-    // 2) Compute dynamic gutters before splitting
-    // ----------------------------
-    // Left label area depends on *scaled* Y range & tick font size (12)
+    // Left label width and legend height estimate
     let left_label_width_px =
         compute_left_label_area_px(min_val / yscale, max_val / yscale, y_label_count, 12);
-    // X-axis text column starts at margin + left label area
     let axis_x_start_px: i32 = MARGIN + left_label_width_px as i32;
 
-    // Legend height for Top/Bottom: pre-measure how much vertical space we need.
-    // Build the list of final legend texts in drawing order (matches series_list).
     let legend_texts: Vec<String> = series_list
         .iter()
-        .map(|(_iso3, _ind, country_label, indicator_label, _s)| {
-            make_label(country_label, indicator_label)
-        })
+        .map(|(_, _, country_label, indicator_label, _)| make_label(country_label, indicator_label))
         .collect();
 
     let (root_w_u32, root_h_u32) = root.dim_in_pixel();
     let root_w = root_w_u32 as i32;
     let root_h = root_h_u32 as i32;
 
-    // Title is generally omitted (best practice). We pass "" later.
-    let has_title = false;
-    let title_font_px: u32 = 16;
-    let font_px: u32 = 14;
-
-    // Estimator to avoid missing-symbol issues:
     let legend_needed_h = if matches!(legend, LegendMode::Top | LegendMode::Bottom) {
-        estimate_top_bottom_legend_height_px(
-            &legend_texts,
-            axis_x_start_px,
-            root_w,
-            /* has_title: */ false, // we render without a legend title by default
-            /* title_font_px: */ 16,
-            /* font_px: */ 14,
-        )
+        estimate_top_bottom_legend_height_px(&legend_texts, axis_x_start_px, root_w, false, 16, 14)
     } else {
         0
     };
 
-    // ----------------------------
-    // 3) Split drawing areas
-    // ----------------------------
+    // Split areas
     let (plot_area, legend_area_opt): (DrawingArea<DB, Shift>, Option<DrawingArea<DB, Shift>>) =
         match legend {
             LegendMode::Right => {
@@ -1120,7 +1069,6 @@ where
             }
             LegendMode::Bottom => {
                 let h = legend_needed_h.max(40);
-                // keep at least 40px for plot area
                 let (plot, legend) = root.split_vertically((root_h - h).max(40));
                 (plot, Some(legend))
             }
@@ -1136,16 +1084,13 @@ where
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     }
 
-    // ----------------------------
-    // 4) Build chart (scaled Y range)
-    // ----------------------------
+    // Chart with scaled Y
     let mut chart = ChartBuilder::on(&plot_area)
         .margin(MARGIN as u32)
         .caption(
             {
                 let t = title.trim();
                 if t.is_empty() || t == "World Bank Indicator(s)" {
-                    // derive from indicator names
                     let mut names: BTreeSet<&str> =
                         points.iter().map(|p| p.indicator_name.as_str()).collect();
                     if names.is_empty() {
@@ -1183,9 +1128,7 @@ where
         .draw()
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-    // ----------------------------
-    // 5) Draw series & collect legend items
-    // ----------------------------
+    // Draw series
     let mut legend_items: Vec<(String, RGBAColor)> = Vec::new();
     let inside_mode = matches!(legend, LegendMode::Inside);
 
@@ -1195,10 +1138,12 @@ where
         | PlotKind::LinePoints
         | PlotKind::Area
         | PlotKind::Loess => {
-            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+            for (_idx, (iso3, indicator_id, country_label, indicator_label, series)) in
                 series_list.iter().enumerate()
             {
-                let color = office_color(idx);
+                let style = SeriesStyle::for_series(iso3, indicator_id);
+                let color_rgba = rgb_color(&style).to_rgba();
+
                 let base_label = make_label(country_label, indicator_label);
                 let legend_label = if matches!(kind, PlotKind::Loess) {
                     format!("{base_label} (LOESS)")
@@ -1206,7 +1151,7 @@ where
                     base_label
                 };
 
-                // Convert to f64 X and **scale Y**
+                // Data coords (f64), Y scaled for plotting
                 let series_f: Vec<(f64, f64)> = series
                     .iter()
                     .map(|(x, y)| (*x as f64, *y / yscale))
@@ -1214,16 +1159,12 @@ where
 
                 match kind {
                     PlotKind::Line => {
-                        let style = ShapeStyle {
-                            color,
-                            filled: false,
-                            stroke_width: 2,
-                        };
+                        let stroke = line_style(&style);
                         let elem = chart
-                            .draw_series(LineSeries::new(series_f.clone(), style))
+                            .draw_series(LineSeries::new(series_f.clone(), stroke))
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         if inside_mode {
-                            let legend_color = color;
+                            let legend_color = color_rgba.clone();
                             let legend_text = legend_label.clone();
                             elem.label(legend_text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
@@ -1235,19 +1176,74 @@ where
                                     )
                             });
                         } else {
-                            legend_items.push((legend_label, color));
+                            legend_items.push((legend_label, color_rgba.clone()));
                         }
                     }
                     PlotKind::Scatter => {
+                        let marker_shape = style.marker;
                         let elem = chart
-                            .draw_series(
-                                series_f
-                                    .iter()
-                                    .map(|(x, y)| Circle::new((*x, *y), 3, color.clone().filled())),
-                            )
+                            .draw_series(PointSeries::of_element(
+                                series_f.clone(),
+                                style.marker_size as i32,
+                                fill_style(&style),
+                                &move |c, s, st| {
+                                    // c: & (f64, f64) in DATA coordinates
+                                    // Shapes use integer BACKEND offsets relative to c
+                                    match marker_shape {
+                                        crate::viz_style::MarkerShape::Circle => {
+                                            (EmptyElement::at(c)
+                                                + Circle::new((0, 0), s, st.filled()))
+                                            .into_dyn()
+                                        }
+                                        crate::viz_style::MarkerShape::Square => {
+                                            (EmptyElement::at(c)
+                                                + Rectangle::new([(-s, -s), (s, s)], st.filled()))
+                                            .into_dyn()
+                                        }
+                                        crate::viz_style::MarkerShape::Triangle => {
+                                            (EmptyElement::at(c)
+                                                + Polygon::new(
+                                                    vec![(0, -s), (-s, s), (s, s)],
+                                                    st.filled(),
+                                                ))
+                                            .into_dyn()
+                                        }
+                                        crate::viz_style::MarkerShape::Diamond => {
+                                            (EmptyElement::at(c)
+                                                + Polygon::new(
+                                                    vec![(0, -s), (-s, 0), (0, s), (s, 0)],
+                                                    st.filled(),
+                                                ))
+                                            .into_dyn()
+                                        }
+                                        crate::viz_style::MarkerShape::Cross => {
+                                            (EmptyElement::at(c)
+                                                + PathElement::new(
+                                                    vec![(-s, 0), (s, 0)],
+                                                    st.stroke_width(2),
+                                                )
+                                                + PathElement::new(
+                                                    vec![(0, -s), (0, s)],
+                                                    st.stroke_width(2),
+                                                ))
+                                            .into_dyn()
+                                        }
+                                        crate::viz_style::MarkerShape::X => (EmptyElement::at(c)
+                                            + PathElement::new(
+                                                vec![(-s, -s), (s, s)],
+                                                st.stroke_width(2),
+                                            )
+                                            + PathElement::new(
+                                                vec![(-s, s), (s, -s)],
+                                                st.stroke_width(2),
+                                            ))
+                                        .into_dyn(),
+                                    }
+                                },
+                            ))
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         if inside_mode {
-                            let legend_color = color;
+                            let legend_color = color_rgba.clone();
                             let legend_text = legend_label.clone();
                             elem.label(legend_text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
@@ -1259,27 +1255,68 @@ where
                                     )
                             });
                         } else {
-                            legend_items.push((legend_label, color));
+                            legend_items.push((legend_label, color_rgba.clone()));
                         }
                     }
                     PlotKind::LinePoints => {
-                        let style = ShapeStyle {
-                            color,
-                            filled: false,
-                            stroke_width: 2,
-                        };
+                        // Line first
+                        let stroke = line_style(&style);
                         chart
-                            .draw_series(LineSeries::new(series_f.clone(), style))
+                            .draw_series(LineSeries::new(series_f.clone(), stroke))
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                        // Then markers (same closure as Scatter)
+                        let marker_shape = style.marker;
                         let elem = chart
-                            .draw_series(
-                                series_f
-                                    .iter()
-                                    .map(|(x, y)| Circle::new((*x, *y), 3, color.clone().filled())),
-                            )
+                            .draw_series(PointSeries::of_element(
+                                series_f.clone(),
+                                style.marker_size as i32,
+                                fill_style(&style),
+                                &move |c, s, st| match marker_shape {
+                                    crate::viz_style::MarkerShape::Circle => (EmptyElement::at(c)
+                                        + Circle::new((0, 0), s, st.filled()))
+                                    .into_dyn(),
+                                    crate::viz_style::MarkerShape::Square => (EmptyElement::at(c)
+                                        + Rectangle::new([(-s, -s), (s, s)], st.filled()))
+                                    .into_dyn(),
+                                    crate::viz_style::MarkerShape::Triangle => {
+                                        (EmptyElement::at(c)
+                                            + Polygon::new(
+                                                vec![(0, -s), (-s, s), (s, s)],
+                                                st.filled(),
+                                            ))
+                                        .into_dyn()
+                                    }
+                                    crate::viz_style::MarkerShape::Diamond => (EmptyElement::at(c)
+                                        + Polygon::new(
+                                            vec![(0, -s), (-s, 0), (0, s), (s, 0)],
+                                            st.filled(),
+                                        ))
+                                    .into_dyn(),
+                                    crate::viz_style::MarkerShape::Cross => (EmptyElement::at(c)
+                                        + PathElement::new(
+                                            vec![(-s, 0), (s, 0)],
+                                            st.stroke_width(2),
+                                        )
+                                        + PathElement::new(
+                                            vec![(0, -s), (0, s)],
+                                            st.stroke_width(2),
+                                        ))
+                                    .into_dyn(),
+                                    crate::viz_style::MarkerShape::X => (EmptyElement::at(c)
+                                        + PathElement::new(
+                                            vec![(-s, -s), (s, s)],
+                                            st.stroke_width(2),
+                                        )
+                                        + PathElement::new(
+                                            vec![(-s, s), (s, -s)],
+                                            st.stroke_width(2),
+                                        ))
+                                    .into_dyn(),
+                                },
+                            ))
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         if inside_mode {
-                            let legend_color = color;
+                            let legend_color = color_rgba.clone();
                             let legend_text = legend_label.clone();
                             elem.label(legend_text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
@@ -1291,13 +1328,13 @@ where
                                     )
                             });
                         } else {
-                            legend_items.push((legend_label, color));
+                            legend_items.push((legend_label, color_rgba.clone()));
                         }
                     }
                     PlotKind::Area => {
                         let baseline_scaled = 0.0f64.min(min_val) / yscale;
-                        let fill = color.clone().mix(0.20).filled();
-                        let border = color.clone().stroke_width(1);
+                        let fill = color_rgba.clone().mix(0.20).filled();
+                        let border = color_rgba.clone().stroke_width(1);
                         let elem = chart
                             .draw_series(
                                 AreaSeries::new(series_f.clone(), baseline_scaled, fill)
@@ -1305,7 +1342,7 @@ where
                             )
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         if inside_mode {
-                            let legend_color = color;
+                            let legend_color = color_rgba.clone();
                             let legend_text = legend_label.clone();
                             elem.label(legend_text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
@@ -1317,11 +1354,10 @@ where
                                     )
                             });
                         } else {
-                            legend_items.push((legend_label, color));
+                            legend_items.push((legend_label, color_rgba.clone()));
                         }
                     }
                     PlotKind::Loess => {
-                        // Smooth on original values, then **scale** the result for plotting
                         let xs: Vec<f64> = series.iter().map(|(x, _)| *x as f64).collect();
                         let ys: Vec<f64> = series.iter().map(|(_, y)| *y).collect();
                         let yhat = loess_series(&xs, &ys, loess_span);
@@ -1329,16 +1365,13 @@ where
                             .into_iter()
                             .zip(yhat.into_iter().map(|v| v / yscale))
                             .collect();
-                        let style = ShapeStyle {
-                            color,
-                            filled: false,
-                            stroke_width: 3,
-                        };
+
+                        let stroke = rgb_color(&style).stroke_width(3);
                         let elem = chart
-                            .draw_series(LineSeries::new(smoothed, style))
+                            .draw_series(LineSeries::new(smoothed, stroke))
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         if inside_mode {
-                            let legend_color = color;
+                            let legend_color = color_rgba.clone();
                             let legend_text = legend_label.clone();
                             elem.label(legend_text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
@@ -1350,7 +1383,7 @@ where
                                     )
                             });
                         } else {
-                            legend_items.push((legend_label, color));
+                            legend_items.push((legend_label, color_rgba.clone()));
                         }
                     }
                     _ => {}
@@ -1361,20 +1394,19 @@ where
             let years_all: Vec<i32> = (min_year..=max_year).collect();
             let mut cum: Vec<f64> = vec![0.0; years_all.len()];
 
-            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+            for (_idx, (iso3, indicator_id, country_label, indicator_label, series)) in
                 series_list.iter().enumerate()
             {
-                let color = office_color(idx);
+                let style = SeriesStyle::for_series(iso3, indicator_id);
+                let color_rgba = rgb_color(&style).to_rgba();
                 let legend_label = make_label(country_label, indicator_label);
 
-                // Map series to full year grid, missing -> 0.0
                 let mut vals: Vec<f64> = vec![0.0; years_all.len()];
                 for (y, v) in series.iter() {
                     if *y >= min_year && *y <= max_year {
                         vals[(*y - min_year) as usize] = (*v).max(0.0);
                     }
                 }
-                // Build upper curve by adding to cumulative
                 let mut upper: Vec<(f64, f64)> = Vec::with_capacity(vals.len());
                 let mut lower: Vec<(f64, f64)> = Vec::with_capacity(vals.len());
                 for (i, v) in vals.iter().enumerate() {
@@ -1383,13 +1415,12 @@ where
                     cum[i] += *v;
                     upper.push((x, cum[i]));
                 }
-                // polygon: lower (forward) + upper (reverse), scaled
                 let mut poly: Vec<(f64, f64)> = Vec::with_capacity(upper.len() * 2);
                 poly.extend(lower.iter().map(|(x, y)| (*x, *y / yscale)));
                 poly.extend(upper.iter().rev().map(|(x, y)| (*x, *y / yscale)));
 
-                let fill = color.clone().mix(0.30).filled();
-                let border = color.clone().stroke_width(1);
+                let fill = color_rgba.clone().mix(0.30).filled();
+                let border = color_rgba.clone().stroke_width(1);
                 chart
                     .draw_series(std::iter::once(Polygon::new(poly, fill)))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
@@ -1403,7 +1434,7 @@ where
                     )))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-                legend_items.push((legend_label, color));
+                legend_items.push((legend_label, color_rgba.clone()));
             }
         }
         PlotKind::GroupedBar => {
@@ -1411,10 +1442,11 @@ where
             let group_width = 0.8f64;
             let bar_w = group_width / n_series as f64;
 
-            for (idx, (_iso3, _indicator_id, country_label, indicator_label, series)) in
+            for (idx, (iso3, indicator_id, country_label, indicator_label, series)) in
                 series_list.iter().enumerate()
             {
-                let color = office_color(idx);
+                let style = SeriesStyle::for_series(iso3, indicator_id);
+                let color_rgba = rgb_color(&style).to_rgba();
                 let legend_label = make_label(country_label, indicator_label);
 
                 for (y, v) in series.iter() {
@@ -1423,20 +1455,18 @@ where
                     let x1 = x0 + bar_w;
                     let y0 = 0.0f64.min(*v) / yscale;
                     let y1 = 0.0f64.max(*v) / yscale;
-                    let rect = Rectangle::new([(x0, y0), (x1, y1)], color.clone().filled());
+                    let rect = Rectangle::new([(x0, y0), (x1, y1)], color_rgba.clone().filled());
                     chart
                         .draw_series(std::iter::once(rect))
                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 }
 
-                legend_items.push((legend_label, color));
+                legend_items.push((legend_label, color_rgba.clone()));
             }
         }
     }
 
-    // ----------------------------
-    // 6) Legend rendering
-    // ----------------------------
+    // Legend
     if inside_mode {
         chart
             .configure_series_labels()
@@ -1447,13 +1477,10 @@ where
             .draw()
             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
     } else if let Some(ref legend_area) = legend_area_opt {
-        // Best practice: no explicit "Legend" title
         draw_legend_panel(legend_area, &legend_items, "", legend, axis_x_start_px)?;
     }
 
-    // ----------------------------
-    // 7) Present
-    // ----------------------------
+    // Present
     plot_area
         .present()
         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
