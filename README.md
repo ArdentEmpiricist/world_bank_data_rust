@@ -99,7 +99,7 @@ anyhow = "1"
 
 ## Quick start (CLI)
 
-Fetch population for Germany & France (2000–2023) and write to CSV (format inferred from extension):
+Fetch population for Germany & France (2000–2023), write to CSV (format inferred from extension) and show quick stats in terminal:
 
 ```bash
 world_bank_data_rust get \
@@ -107,19 +107,10 @@ world_bank_data_rust get \
   --indicators SP.POP.TOTL \
   --date 2000:2023 \
   --out pop.csv
+  --stats
 ```
 
 Render a plot (backend inferred from extension):
-
-```bash
-world_bank_data_rust get \
-  --countries DEU;FRA \
-  --indicators SP.POP.TOTL \
-  --date 2000:2023 \
-  --plot pop.svg
-```
-
-Example for:
 
 ```bash
 world_bank_data_rust get \
