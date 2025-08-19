@@ -114,6 +114,16 @@ pub struct CodeName {
     pub value: String,
 }
 
+/// Minimal indicator metadata from the indicator endpoint response.
+/// Used to fetch units for enriching DataPoint.unit when observation rows lack a unit.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndicatorMeta {
+    pub id: String,
+    #[serde(alias = "value")]
+    pub name: String,
+    pub unit: Option<String>,
+}
+
 /// Raw entry from the API (position 1 array).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entry {

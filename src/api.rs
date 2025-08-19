@@ -22,7 +22,7 @@
 /// )?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-use crate::models::{DataPoint, DateSpec, Entry, Meta};
+use crate::models::{DataPoint, DateSpec, Entry, Meta, IndicatorMeta};
 use anyhow::{Context, Result, bail};
 use percent_encoding::{AsciiSet, NON_ALPHANUMERIC};
 use reqwest::blocking::Client as HttpClient;
@@ -95,6 +95,85 @@ fn enc_join<'a>(parts: impl IntoIterator<Item = &'a str>) -> String {
 }
 
 impl Client {
+    /// Fetch units from the World Bank indicator endpoint for the given indicators.
+    ///
+    /// Returns a map from indicator ID to unit string. Missing indicators or those
+    /// without units will not be present in the returned HashMap.
+    ///
+    /// ### Arguments
+    /// - `indicators`: Indicator IDs to fetch metadata for (e.g., `["SP.POP.TOTL"]`).
+    ///
+    /// ### Example
+    /// ```no_run
+    /// # use world_bank_data_rust::Client;
+    /// let cli = Client::default();
+    /// let units = cli.fetch_indicator_units(&["SP.POP.TOTL".into()])?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    pub fn fetch_indicator_units(&self, indicators: &[String]) -> Result<std::collections::HashMap<String, String>> {
+        use std::collections::HashMap;
+        
+        if indicators.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let indicator_spec = enc_join(indicators.iter().map(|s| s.as_str()));
+        let url = format!(
+            "{}/indicator/{}?format=json&per_page=1000",
+            self.base_url, indicator_spec
+        );
+
+        // Use the same retry logic as the main fetch method
+        let get_json = |u: &str| -> Result<Value> {
+            let mut last_err: Option<anyhow::Error> = None;
+            for backoff_ms in [100u64, 300, 700] {
+                match self.http.get(u).send() {
+                    Ok(r) if r.status().is_success() => {
+                        return r.json().context("decode json");
+                    }
+                    Ok(r) if r.status().is_server_error() => { /* retry */ }
+                    Ok(r) => bail!("request failed with HTTP {}", r.status()),
+                    Err(e) => last_err = Some(e.into()),
+                }
+                std::thread::sleep(Duration::from_millis(backoff_ms));
+            }
+            bail!("network error: {:?}", last_err);
+        };
+
+        let v: Value = get_json(&url).with_context(|| format!("GET {}", url))?;
+
+        // Parse the response (same structure as data endpoint: [Meta, [IndicatorMeta, ...]])
+        let arr = v.as_array().ok_or_else(|| {
+            anyhow::anyhow!("unexpected response shape: not a top-level array")
+        })?;
+        if arr.is_empty() {
+            bail!("unexpected response: empty array");
+        }
+
+        // Check for API error
+        if arr[0].get("message").is_some() {
+            bail!("world bank api error: {}", arr[0]);
+        }
+
+        let indicators_data: Vec<IndicatorMeta> = if arr.len() > 1 {
+            serde_json::from_value(arr[1].clone()).context("parse indicator metadata")?
+        } else {
+            vec![]
+        };
+
+        // Build map from ID to unit
+        let mut result = HashMap::new();
+        for meta in indicators_data {
+            if let Some(unit) = meta.unit {
+                if !unit.trim().is_empty() {
+                    result.insert(meta.id, unit);
+                }
+            }
+        }
+
+        Ok(result)
+    }
+
     /// Fetch indicator observations.
     ///
     /// - `countries`: ISO2 (e.g., "DE") or ISO3 (e.g., "DEU") or aggregates (e.g., "EUU"). Multiple accepted.
@@ -187,6 +266,30 @@ impl Client {
             }
             page += 1;
         }
+
+        // Unit enrichment: if any DataPoints lack units, try to fetch from indicator metadata
+        let needs_enrichment = out.iter().any(|p| p.unit.is_none() || p.unit.as_ref().map(|u| u.trim().is_empty()).unwrap_or(false));
+        
+        if needs_enrichment {
+            // Fetch indicator metadata to get units
+            match self.fetch_indicator_units(indicators) {
+                Ok(indicator_units) => {
+                    // Enrich DataPoints that lack units
+                    for point in &mut out {
+                        if point.unit.is_none() || point.unit.as_ref().map(|u| u.trim().is_empty()).unwrap_or(false) {
+                            if let Some(unit) = indicator_units.get(&point.indicator_id) {
+                                point.unit = Some(unit.clone());
+                            }
+                        }
+                    }
+                }
+                Err(_) => {
+                    // If indicator metadata fetch fails, continue without enrichment
+                    // This ensures that the main data fetch doesn't fail due to metadata issues
+                }
+            }
+        }
+
         Ok(out)
     }
 }

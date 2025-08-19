@@ -208,6 +208,15 @@ fn main() -> Result<()> {
 }
 ```
 
+The `fetch` method automatically enriches `DataPoint.unit` values when observation rows lack a unit by fetching metadata from the World Bank indicator endpoint. This ensures that visualization and analysis code has access to appropriate unit information for axis labeling and scaling decisions.
+
+If you need to manually fetch indicator units for specific indicators:
+
+```rust
+let units = api.fetch_indicator_units(&["SP.POP.TOTL".into(), "NY.GDP.MKTP.CD".into()])?;
+// Returns HashMap<String, String> mapping indicator ID to unit
+```
+
 ### Export data (atomic CSV/JSON)
 
 ```rust
@@ -241,6 +250,12 @@ use world_bank_data_rust::viz::plot_chart;
 // The backend is selected from the output extension (.svg, .png).
 plot_chart(&points, "pop.svg")?;
 ```
+
+Charts automatically derive appropriate units for axis labeling using a two-tier approach:
+1. **Prefer units from DataPoint.unit**: When all points have the same non-empty unit, use it directly for axis labeling
+2. **Fallback to indicator name parsing**: For single-indicator plots without consistent units, extract unit information from parentheses in the indicator name (e.g., "GDP (current US$)" → "current US$")
+
+This approach ensures that both API-provided units and legacy indicator naming conventions are properly handled for visualization.
 
 ### Data model
 
