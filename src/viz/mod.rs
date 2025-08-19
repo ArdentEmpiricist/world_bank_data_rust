@@ -42,8 +42,7 @@ use util::{
     map_locale, office_color,
 };
 
-#[cfg(feature = "country-styles")]
-use crate::style as country_style;
+
 
 use loess::loess_series;
 

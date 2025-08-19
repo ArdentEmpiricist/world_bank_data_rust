@@ -4,6 +4,43 @@
 //! a styling system where all series for the same country share one base hue
 //! from the MS Office palette, while indicators within that country are
 //! differentiated by shades, marker shapes, and line dash patterns.
+//!
+//! # Usage
+//!
+//! This module is only available when the `country-styles` feature is enabled:
+//!
+//! ```toml
+//! [dependencies]
+//! world_bank_data_rust = { version = "0.1", features = ["country-styles"] }
+//! ```
+//!
+//! # Example
+//!
+//! ```rust
+//! # #[cfg(feature = "country-styles")]
+//! # {
+//! use world_bank_data_rust::style::{SeriesKey, assign_country_styles};
+//!
+//! let series = vec![
+//!     SeriesKey::new("USA".to_string(), "GDP".to_string()),
+//!     SeriesKey::new("USA".to_string(), "Population".to_string()),
+//!     SeriesKey::new("DEU".to_string(), "GDP".to_string()),
+//! ];
+//!
+//! let styles = assign_country_styles(&series, 255);
+//! 
+//! // All USA series will have the same base_hue
+//! // Different indicators will have different shades, markers, and dash patterns
+//! # }
+//! ```
+//!
+//! # Design Principles
+//!
+//! - **Country consistency**: All series for the same country use the same base hue
+//! - **Indicator differentiation**: Different indicators use brightness variations, 
+//!   unique marker shapes, and line dash patterns for redundant visual encoding
+//! - **Deterministic**: Identical inputs always produce identical outputs
+//! - **MS Office compatibility**: Uses the standard MS Office color palette
 
 use std::collections::HashMap;
 
