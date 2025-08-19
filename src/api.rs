@@ -197,6 +197,17 @@ impl Client {
             bail!("at least one indicator code required");
         }
 
+        // Multi-indicator fallback: if multiple indicators without source,
+        // fetch each indicator separately and merge results
+        if indicators.len() > 1 && source.is_none() {
+            let mut all_points = Vec::new();
+            for indicator in indicators {
+                let points = self.fetch(countries, &[indicator.clone()], date.clone(), None)?;
+                all_points.extend(points);
+            }
+            return Ok(all_points);
+        }
+
         let country_spec = enc_join(countries.iter().map(|s| s.as_str()));
         let indicator_spec = enc_join(indicators.iter().map(|s| s.as_str()));
 
