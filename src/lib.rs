@@ -57,5 +57,9 @@ pub mod viz;
 pub mod viz_plotters_adapter;
 pub mod viz_style;
 
+// Feature-gated country-consistent styling module
+#[cfg(feature = "country-styles")]
+pub mod style;
+
 pub use api::Client;
 pub use models::{DataPoint, DateSpec, GroupKey};

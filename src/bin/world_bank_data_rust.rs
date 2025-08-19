@@ -95,6 +95,10 @@ struct GetArgs {
     /// LOESS span in (0,1]; fraction of neighbors used (only for --plot-kind loess)
     #[arg(long = "loess-span", default_value_t = 0.3, value_parser = parse_loess_span)]
     loess_span: f64,
+    /// Enable country-consistent styling (requires country-styles feature)
+    #[cfg(feature = "country-styles")]
+    #[arg(long = "country-styles", default_value_t = false)]
+    country_styles: bool,
 }
 
 fn parse_list(s: &str) -> Vec<String> {
