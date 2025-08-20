@@ -142,7 +142,7 @@ You can enable country-consistent styling where all series for the same country 
 # Use country-consistent styling
 wbi get \
   --countries USA,DEU \
-  --indicators NY.GDP.MKTP.CD,SP.POP.TOTL \
+  --indicators SP.POP.TOTL,SP.POP.TOTL.FE.IN \
   --date 2010:2020 \
   --plot multi_indicator.svg \
   --plot-kind line-points \
