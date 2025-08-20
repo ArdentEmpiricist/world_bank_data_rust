@@ -17,7 +17,7 @@ use serde_json::Value;
 // calling it directly. If the test currently shells out to the binary, keep that
 // approach. The helpers below are written to be minimally invasive and should be
 // adaptable to your current code.
-#[cfg(feature = "blocking-http")]
+#[cfg(feature = "online")]
 use reqwest::blocking::Client;
 
 /// Configure the indicator for the test:
@@ -29,7 +29,7 @@ fn indicator_code() -> String {
 
 /// Returns Some(unit) if present in indicator metadata, accepting multiple possible fields.
 /// Returns None if no usable unit is found.
-#[cfg(feature = "blocking-http")]
+#[cfg(feature = "online")]
 fn fetch_unit_from_api(indicator: &str) -> Option<String> {
     let url = format!(
         "https://api.worldbank.org/v2/indicator/{}?format=json",
@@ -48,7 +48,7 @@ fn fetch_unit_from_api(indicator: &str) -> Option<String> {
     // Typical WB API shape: [metadata, [indicator objects...]]
     let arr = v.as_array()?;
     let indicators = arr.get(1)?.as_array()?;
-    let obj = indicators.get(0)?.as_object()?;
+    let obj = indicators.first()?.as_object()?;
 
     // Try several known keys that might carry unit information
     let candidates = [
@@ -106,10 +106,10 @@ fn api_provided_unit_appears_in_chart_or_fallback_is_used() {
 
     let indicator = indicator_code();
 
-    #[cfg(feature = "blocking-http")]
+    #[cfg(feature = "online")]
     let unit_opt = fetch_unit_from_api(&indicator);
 
-    #[cfg(not(feature = "blocking-http"))]
+    #[cfg(not(feature = "online"))]
     let unit_opt: Option<String> = None;
 
     // Read the SVG and check that it contains the API-provided unit

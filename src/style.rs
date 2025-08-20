@@ -202,9 +202,9 @@ pub fn assign_country_styles_with_palette(
     // Helper function to adjust color brightness
     fn adjust_brightness(color: (u8, u8, u8), factor: f64) -> (u8, u8, u8) {
         let (r, g, b) = color;
-        let new_r = ((r as f64 * factor).min(255.0).max(0.0)) as u8;
-        let new_g = ((g as f64 * factor).min(255.0).max(0.0)) as u8;
-        let new_b = ((b as f64 * factor).min(255.0).max(0.0)) as u8;
+        let new_r = (r as f64 * factor).clamp(0.0, 255.0) as u8;
+        let new_g = (g as f64 * factor).clamp(0.0, 255.0) as u8;
+        let new_b = (b as f64 * factor).clamp(0.0, 255.0) as u8;
         (new_r, new_g, new_b)
     }
 
