@@ -47,10 +47,20 @@ enum PlotKindArg {
     Loess,
 }
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 enum CountryStylesArg {
-    Color,
+    On,
     Symbols,
+    Off,
+}
+
+impl CountryStylesArg {
+    fn enabled(self) -> bool {
+        match self {
+            CountryStylesArg::On | CountryStylesArg::Symbols => true,
+            CountryStylesArg::Off => false,
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -101,8 +111,11 @@ struct GetArgs {
     /// LOESS span in (0,1]; fraction of neighbors used (only for --plot-kind loess)
     #[arg(long = "loess-span", default_value_t = 0.3, value_parser = parse_loess_span)]
     loess_span: f64,
-    /// Enable country-consistent styling
-    #[arg(long = "country-styles", value_enum)]
+    /// Enable country-consistent styling. Optional value: on|symbols|off.
+    /// - `--country-styles` (no value) == on
+    /// - `--country-styles symbols` == on with symbol emphasis
+    /// - `--country-styles off` == disabled
+    #[arg(long = "country-styles", value_enum, num_args = 0..=1, default_missing_value = "on")]
     country_styles: Option<CountryStylesArg>,
 }
 
@@ -256,10 +269,8 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             PlotKindArg::GroupedBar => viz::PlotKind::GroupedBar,
             PlotKindArg::Loess => viz::PlotKind::Loess,
         };
-        let country_styles_mode = args.country_styles.map(|cs| match cs {
-            CountryStylesArg::Color => viz::CountryStylesMode::Color,
-            CountryStylesArg::Symbols => viz::CountryStylesMode::Symbols,
-        });
+        let country_styles_enabled = args.country_styles.map(|m| m.enabled()).unwrap_or(false);
+
         viz::plot_chart(
             &points,
             plot_path,
@@ -270,7 +281,7 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             title,
             plot_kind,
             args.loess_span,
-            country_styles_mode,
+            Some(country_styles_enabled),
         )?;
         eprintln!("Wrote plot to {}", plot_path.display());
     }
