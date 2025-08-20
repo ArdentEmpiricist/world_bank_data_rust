@@ -19,6 +19,7 @@ target/
 !assets/logo.png
 !assets/example_plot.svg
 !assets/example_stats.png
+!assets/example_multi_indicator.svg
 
 *.csv
 *.svg

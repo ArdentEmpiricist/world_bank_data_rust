@@ -519,44 +519,38 @@ where
     // Helper function to get the appropriate color for a series
     let get_series_color = |idx: usize, iso3: &str, indicator_id: &str| -> RGBAColor {
         // Use country-consistent styling if enabled
-        if use_country_styles {
-            if let Some(country_index) = country_list.iter().position(|c| c == iso3) {
-                // Use the MS Office palette for base colors
-                let base_colors = [
-                    (68, 114, 196),  // blue
-                    (237, 125, 49),  // orange
-                    (165, 165, 165), // gray
-                    (255, 192, 0),   // gold
-                    (91, 155, 213),  // light blue
-                    (112, 173, 71),  // green
-                    (38, 68, 120),   // dark blue
-                    (158, 72, 14),   // dark orange
-                    (99, 99, 99),    // dark gray
-                    (153, 115, 0),   // brownish
-                ];
+        if use_country_styles
+            && let Some(country_index) = country_list.iter().position(|c| c == iso3)
+        {
+            // Use the MS Office palette for base colors
+            let base_colors = [
+                (68, 114, 196),  // blue
+                (237, 125, 49),  // orange
+                (165, 165, 165), // gray
+                (255, 192, 0),   // gold
+                (91, 155, 213),  // light blue
+                (112, 173, 71),  // green
+                (38, 68, 120),   // dark blue
+                (158, 72, 14),   // dark orange
+                (99, 99, 99),    // dark gray
+                (153, 115, 0),   // brownish
+            ];
 
-                let base_color = base_colors[country_index % base_colors.len()];
+            let base_color = base_colors[country_index % base_colors.len()];
 
-                // Create brightness variation based on indicator
-                use std::collections::hash_map::DefaultHasher;
-                use std::hash::{Hash, Hasher};
-                let mut hasher = DefaultHasher::new();
-                indicator_id.hash(&mut hasher);
-                let indicator_hash = hasher.finish();
+            // Create brightness variation based on indicator
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            indicator_id.hash(&mut hasher);
+            let indicator_hash = hasher.finish();
 
-                let brightness_factor = 0.7 + 0.6 * ((indicator_hash % 100) as f64 / 100.0);
-                let adjusted_r = ((base_color.0 as f64 * brightness_factor)
-                    .min(255.0)
-                    .max(0.0)) as u8;
-                let adjusted_g = ((base_color.1 as f64 * brightness_factor)
-                    .min(255.0)
-                    .max(0.0)) as u8;
-                let adjusted_b = ((base_color.2 as f64 * brightness_factor)
-                    .min(255.0)
-                    .max(0.0)) as u8;
+            let brightness_factor = 0.7 + 0.6 * ((indicator_hash % 100) as f64 / 100.0);
+            let adjusted_r = (base_color.0 as f64 * brightness_factor).clamp(0.0, 255.0) as u8;
+            let adjusted_g = (base_color.1 as f64 * brightness_factor).clamp(0.0, 255.0) as u8;
+            let adjusted_b = (base_color.2 as f64 * brightness_factor).clamp(0.0, 255.0) as u8;
 
-                return RGBAColor(adjusted_r, adjusted_g, adjusted_b, 1.0);
-            }
+            return RGBAColor(adjusted_r, adjusted_g, adjusted_b, 1.0);
         }
 
         // Default fallback: use index-based coloring

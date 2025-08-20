@@ -59,7 +59,6 @@ mod tests {
         ]
     }
 
-    #[cfg(feature = "country-styles")]
     #[test]
     fn test_country_styles_enabled() {
         let data = create_test_data();
@@ -124,7 +123,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "country-styles")]
     #[test]
     fn test_deterministic_country_styling() {
         let data = create_test_data();

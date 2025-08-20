@@ -14,6 +14,8 @@
 //! ## Feature flags
 //! - `online`: enables live API tests/examples. (The library itself works without it.)
 //!
+//! Country-consistent styling is available as a runtime option via `viz::plot_chart(.., Some(true))` or the CLI `--country-styles` flag.
+//!
 //! ## Quick example
 //! ```no_run
 //! use wbi_rs::{Client, DateSpec};
@@ -58,8 +60,7 @@ pub mod viz;
 pub mod viz_plotters_adapter;
 pub mod viz_style;
 
-// Feature-gated country-consistent styling module
-#[cfg(feature = "country-styles")]
+// Country-consistent styling module (always available)
 pub mod style;
 
 pub use api::Client;
