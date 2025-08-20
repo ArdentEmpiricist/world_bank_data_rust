@@ -141,7 +141,7 @@ You can enable country-consistent styling where all series for the same country 
 ```bash
 # Use country-consistent styling
 wbi get \
-  --countries USA,DEU \
+  --countries USA,CHN,IND,DEU \
   --indicators SP.POP.TOTL,SP.POP.TOTL.FE.IN \
   --date 2010:2020 \
   --plot multi_indicator.svg \
