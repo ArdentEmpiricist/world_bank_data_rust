@@ -84,7 +84,23 @@ pub fn fill_style(style: &SeriesStyle) -> ShapeStyle {
     rgb_color(style).filled()
 }
 
-/// Construct a marker DynElement at the given anchor coordinate `c`.
+/// Draw a compact legend swatch that represents both the line and the marker.
+pub fn legend_swatch<DB>(
+    x: i32,
+    y: i32,
+    style: &SeriesStyle,
+    marker: MarkerShape,
+) -> DynElement<'static, DB, (i32, i32)>
+where
+    DB: DrawingBackend + 'static,
+{
+    let st = line_style(style);
+    let marker_size = style.marker_size as i32;
+    (EmptyElement::at((x, y))
+        + PathElement::new(vec![(x - 14, y), (x + 14, y)], st.clone())
+        + make_marker::<DB>((x, y), marker_size, fill_style(style), marker))
+    .into_dyn()
+}
 /// This version uses the concrete coordinate type `(i32, i32)` and requires the backend `DB` to be `'static`.
 ///
 /// Call from PointSeries::of_element with:

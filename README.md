@@ -136,10 +136,10 @@ Output:
 
 ### Country-Consistent Styling
 
-You can enable country-consistent styling where all series for the same country share one base hue from the MS Office palette, while indicators within that country are differentiated by shades:
+You can enable country-consistent styling where all series for the same country share one base hue, while indicators within that country are differentiated by symbols:
 
 ```bash
-# Use country-consistent styling
+# Use country-consistent styling (colors + symbols)
 wbi get \
   --countries USA,CHN,IND,DEU \
   --indicators SP.POP.TOTL,SP.POP.TOTL.FE.IN \
@@ -149,10 +149,16 @@ wbi get \
   --country-styles
 ```
 
+Optionally pass a mode:
+
+- `--country-styles on`      enables styling (same as bare `--country-styles`)
+- `--country-styles symbols` enables styling with symbol emphasis
+- `--country-styles off`     disables styling explicitly
+
 This feature ensures that:
 
 - All series from the same country use the same base color hue
-- Different indicators within a country are differentiated by brightness variations
+- Different indicators within a country are differentiated by brightness variations and unique marker shapes
 - Marker shapes and line dash patterns provide additional visual distinction
 - The styling is deterministic and consistent across runs
 
@@ -170,7 +176,7 @@ Subcommand `get` accepts at least:
 - `--source` optional source ID (e.g., `2` for WDI). Recommended for efficiency when querying multiple indicators, but optional.
 - `--out <PATH>` optional export (CSV/JSON); **atomic**
 - `--plot <PATH>` optional chart output (SVG/PNG), using Plotters
-- `--country-styles` enable country-consistent styling for multi-indicator plots at runtime
+- `--country-styles` enable country-consistent styling with optional mode (on|symbols|off)
 
 ### Format inference for `--out`
 

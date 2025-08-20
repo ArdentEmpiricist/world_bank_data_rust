@@ -4,7 +4,7 @@
 mod tests {
     use tempfile::NamedTempFile;
     use wbi_rs::models::DataPoint;
-    use wbi_rs::viz::{CountryStylesMode, LegendMode, PlotKind};
+    use wbi_rs::viz::{LegendMode, PlotKind};
 
     fn create_test_data() -> Vec<DataPoint> {
         vec![
@@ -76,7 +76,7 @@ mod tests {
             "Country Styles Test",
             PlotKind::LinePoints,
             0.3,
-            Some(CountryStylesMode::Color), // enable country styles - color mode
+            Some(true), // enable country styles
         );
 
         assert!(result.is_ok(), "Country styles plot should succeed");
@@ -108,7 +108,7 @@ mod tests {
             "Country Styles Symbols Test",
             PlotKind::LinePoints,
             0.3,
-            Some(CountryStylesMode::Symbols), // enable country styles - symbols mode
+            Some(true), // enable country styles - symbols mode
         );
 
         assert!(result.is_ok(), "Country styles symbols plot should succeed");
@@ -183,7 +183,7 @@ mod tests {
             "Deterministic Test 1",
             PlotKind::LinePoints,
             0.3,
-            Some(CountryStylesMode::Color),
+            Some(true),
         )
         .unwrap();
 
@@ -198,7 +198,7 @@ mod tests {
             "Deterministic Test 1", // same title to ensure identical output
             PlotKind::LinePoints,
             0.3,
-            Some(CountryStylesMode::Color),
+            Some(true),
         )
         .unwrap();
 
