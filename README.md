@@ -155,7 +155,10 @@ This feature ensures that:
 - Different indicators within a country are differentiated by brightness variations
 - The styling is deterministic and consistent across runs
 
-The `--country-styles` option is available at runtime and does not require any special build flags.
+Output:
+<p align="center">
+  <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/refs/heads/main/assets/example_multi_indicator.svg" alt="example plot" style='width: 90%; object-fit: contain'/>
+</p>
 
 ---
 
