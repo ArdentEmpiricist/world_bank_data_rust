@@ -607,9 +607,10 @@ where
 
                 match kind {
                     PlotKind::Line => {
-                        if use_symbols && line_dash.is_some() {
-                            // For symbols mode, implement basic dashed line patterns
-                            match line_dash.unwrap() {
+                        if let Some(dash) = line_dash {
+                            if use_symbols {
+                                // For symbols mode, implement basic dashed line patterns
+                                match dash {
                                 crate::viz_style::LineDash::Solid => {
                                     let style = ShapeStyle {
                                         color,
@@ -631,7 +632,7 @@ where
                                     for chunk in series_f.chunks(2) {
                                         if chunk.len() >= 2 {
                                             chart
-                                                .draw_series(LineSeries::new(chunk.iter().cloned(), style.clone()))
+                                                .draw_series(LineSeries::new(chunk.iter().cloned(), style))
                                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                         }
                                     }
@@ -658,7 +659,7 @@ where
                                             if i % 2 == 0 {
                                                 // Dash segment
                                                 chart
-                                                    .draw_series(LineSeries::new(chunk.iter().cloned(), style.clone()))
+                                                    .draw_series(LineSeries::new(chunk.iter().cloned(), style))
                                                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                             } else {
                                                 // Dot segment
@@ -671,6 +672,7 @@ where
                                             }
                                         }
                                     }
+                                }
                                 }
                             }
                         } else {
@@ -688,12 +690,10 @@ where
                             let _legend_color = color;
                             let _legend_text = legend_label.clone();
                             // TODO: Update inside legend to show line dash
+                        } else if use_symbols {
+                            legend_items_with_styles.push((legend_label, color, None, line_dash));
                         } else {
-                            if use_symbols {
-                                legend_items_with_styles.push((legend_label, color, None, line_dash));
-                            } else {
-                                legend_items.push((legend_label, color));
-                            }
+                            legend_items.push((legend_label, color));
                         }
                     }
                     PlotKind::Scatter => {
@@ -724,19 +724,18 @@ where
                             let _legend_color = color;
                             let _legend_text = legend_label.clone();
                             // TODO: Update inside legend to show marker shape
+                        } else if use_symbols {
+                            legend_items_with_styles.push((legend_label, color, marker_shape, None));
                         } else {
-                            if use_symbols {
-                                legend_items_with_styles.push((legend_label, color, marker_shape, None));
-                            } else {
-                                legend_items.push((legend_label, color));
-                            }
+                            legend_items.push((legend_label, color));
                         }
                     }
                     PlotKind::LinePoints => {
                         // Draw line with appropriate style
-                        if use_symbols && line_dash.is_some() {
-                            // Use the same logic as Line plot for dash patterns
-                            match line_dash.unwrap() {
+                        if let Some(dash) = line_dash {
+                            if use_symbols {
+                                // Use the same logic as Line plot for dash patterns
+                                match dash {
                                 crate::viz_style::LineDash::Solid => {
                                     let style = ShapeStyle {
                                         color,
@@ -756,7 +755,7 @@ where
                                     for chunk in series_f.chunks(2) {
                                         if chunk.len() >= 2 {
                                             chart
-                                                .draw_series(LineSeries::new(chunk.iter().cloned(), style.clone()))
+                                                .draw_series(LineSeries::new(chunk.iter().cloned(), style))
                                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                         }
                                     }
@@ -771,6 +770,7 @@ where
                                     chart
                                         .draw_series(LineSeries::new(series_f.clone(), style))
                                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                                }
                                 }
                             }
                         } else {
@@ -810,12 +810,10 @@ where
                             let _legend_color = color;
                             let _legend_text = legend_label.clone();
                             // TODO: Update inside legend
+                        } else if use_symbols {
+                            legend_items_with_styles.push((legend_label, color, marker_shape, line_dash));
                         } else {
-                            if use_symbols {
-                                legend_items_with_styles.push((legend_label, color, marker_shape, line_dash));
-                            } else {
-                                legend_items.push((legend_label, color));
-                            }
+                            legend_items.push((legend_label, color));
                         }
                     }
                     PlotKind::Area => {
