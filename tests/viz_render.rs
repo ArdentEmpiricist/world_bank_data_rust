@@ -3,6 +3,9 @@ use std::path::PathBuf;
 use wbi_rs::models::DataPoint;
 use wbi_rs::viz::{self, LegendMode, PlotKind};
 
+#[cfg(feature = "country-styles")]
+use wbi_rs::viz::types::CountryStylesMode;
+
 fn sample_points() -> Vec<DataPoint> {
     let mut out = Vec::new();
     // Series 1: DEU
@@ -126,4 +129,61 @@ fn empty_points_is_error() {
         None, // no country styles in tests
     );
     assert!(e.is_err());
+}
+
+#[test]
+#[cfg(feature = "country-styles")]
+fn test_dash_patterns_with_symbols() {
+    // Create test data with multiple series to test dash patterns
+    let mut points = sample_points();
+    
+    // Add more series to test different dash patterns
+    for (y, v) in [(2019, 1.5), (2020, 2.2), (2021, 3.2)] {
+        points.push(DataPoint {
+            indicator_id: "Y".into(),
+            indicator_name: "Second Indicator".into(),
+            country_id: "FR".into(),
+            country_name: "France".into(),
+            country_iso3: "FRA".into(),
+            year: y,
+            value: Some(v),
+            unit: None,
+            obs_status: None,
+            decimal: None,
+        });
+    }
+    
+    for (y, v) in [(2019, 2.8), (2020, 3.1), (2021, 3.8)] {
+        points.push(DataPoint {
+            indicator_id: "Z".into(),
+            indicator_name: "Third Indicator".into(),
+            country_id: "JP".into(),
+            country_name: "Japan".into(),
+            country_iso3: "JPN".into(),
+            year: y,
+            value: Some(v),
+            unit: None,
+            obs_status: None,
+            decimal: None,
+        });
+    }
+
+    write_and_check(
+        |p| {
+            viz::plot_chart(
+                &points,
+                p,
+                1200,
+                800,
+                "en",
+                LegendMode::Right,
+                "Dash Pattern Test",
+                PlotKind::Line,
+                0.3,
+                Some(CountryStylesMode::Symbols), // Enable symbols mode to test dash patterns
+            )
+            .unwrap();
+        },
+        "dash_patterns_test",
+    );
 }

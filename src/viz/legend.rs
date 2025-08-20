@@ -9,6 +9,7 @@ use plotters::style::text_anchor::{HPos, Pos, VPos};
 
 use super::text::{estimate_text_width_px, wrap_text_to_width};
 use super::types::LegendMode;
+use crate::viz_style::{LineDash, MarkerShape};
 
 /// Estimate how tall the TOP/BOTTOM legend band must be to fit all items,
 /// honoring wrapping and multi-row flow. Returns pixels.
@@ -388,5 +389,263 @@ pub fn draw_legend_panel<DB: DrawingBackend>(
         }
     }
 
+    Ok(())
+}
+
+/// Enhanced legend panel that supports line dash patterns and marker shapes.
+/// This is used when country-styles mode is enabled with symbols.
+pub fn draw_enhanced_legend_panel<DB: DrawingBackend>(
+    legend_area: &DrawingArea<DB, Shift>,
+    items: &[(String, RGBAColor, Option<MarkerShape>, Option<LineDash>)],
+    title: &str, // pass "" to omit (recommended)
+    placement: LegendMode,
+    axis_x_start_px: i32, // plot's X-axis start (from root's left edge)
+) -> Result<()> {
+    legend_area
+        .fill(&WHITE)
+        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
+    let (w_u32, _) = legend_area.dim_in_pixel();
+    let w = w_u32 as i32;
+
+    // Layout constants (must match estimator)
+    let font_px: u32 = 14;
+    let line_h: i32 = font_px as i32 + 2;
+    let row_gap: i32 = 4;
+    let pad_small: i32 = 6;
+    let pad_band: i32 = 8;
+    let marker_radius: i32 = 4;
+    let marker_to_text_gap: i32 = 12;
+    let trailing_gap: i32 = 12;
+    let line_sample_width: i32 = 16; // Width of line sample in legend
+
+    // Styles
+    let has_title = !title.trim().is_empty();
+    let title_font_px: u32 = 16;
+    let title_style: TextStyle = TextStyle::from((FontFamily::SansSerif, title_font_px))
+        .pos(Pos::new(HPos::Left, VPos::Top));
+    let label_style_center: TextStyle =
+        TextStyle::from((FontFamily::SansSerif, font_px)).pos(Pos::new(HPos::Left, VPos::Center));
+
+    match placement {
+        LegendMode::Right => {
+            // Right-panel: simple single-column list with enhanced glyphs
+            let pad_x: i32 = 6;
+
+            let mut y = if has_title {
+                let title_y_top = pad_small;
+                legend_area
+                    .draw(&Text::new(title, (pad_x, title_y_top), title_style.clone()))
+                    .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                title_y_top + title_font_px as i32 + 8
+            } else {
+                pad_small + 6
+            };
+
+            let glyph_start_x = pad_x;
+            let glyph_width = line_sample_width + marker_radius * 2;
+            let text_x = glyph_start_x + glyph_width + marker_to_text_gap;
+            let max_text_w = (w - text_x - pad_x).max(40) as u32;
+
+            for (label, color, marker_shape, line_dash) in items {
+                let lines = wrap_text_to_width(label, font_px, max_text_w);
+                let block_h = (lines.len().max(1) as i32) * line_h;
+                let block_center_y = y + block_h / 2;
+
+                // Draw line sample with dash pattern
+                let line_start_x = glyph_start_x;
+                let line_end_x = glyph_start_x + line_sample_width;
+                let line_y = block_center_y;
+                
+                draw_legend_line_sample(
+                    legend_area, 
+                    line_start_x, 
+                    line_end_x, 
+                    line_y, 
+                    *color, 
+                    line_dash.unwrap_or(LineDash::Solid)
+                )?;
+
+                // Draw marker shape at center of line
+                let marker_x = glyph_start_x + line_sample_width / 2;
+                draw_legend_marker(
+                    legend_area,
+                    marker_x,
+                    line_y,
+                    marker_radius,
+                    *color,
+                    marker_shape.unwrap_or(MarkerShape::Circle)
+                )?;
+
+                for (i, line) in lines.iter().enumerate() {
+                    let line_center_y = y + (i as i32) * line_h + line_h / 2;
+                    legend_area
+                        .draw(&Text::new(
+                            line.as_str(),
+                            (text_x, line_center_y),
+                            label_style_center.clone(),
+                        ))
+                        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                }
+
+                y += block_h + row_gap;
+            }
+        }
+
+        LegendMode::Top | LegendMode::Bottom => {
+            // For now, fall back to simple circles for top/bottom legends
+            // This can be enhanced later with proper glyph rendering
+            let simple_items: Vec<(String, RGBAColor)> = items
+                .iter()
+                .map(|(label, color, _, _)| (label.clone(), *color))
+                .collect();
+            
+            return draw_legend_panel(legend_area, &simple_items, title, placement, axis_x_start_px);
+        }
+
+        LegendMode::Inside => {
+            // Not used for external panel layout
+        }
+    }
+
+    Ok(())
+}
+
+/// Draw a line sample with the specified dash pattern
+fn draw_legend_line_sample<DB: DrawingBackend>(
+    legend_area: &DrawingArea<DB, Shift>,
+    start_x: i32,
+    end_x: i32, 
+    y: i32,
+    color: RGBAColor,
+    line_dash: LineDash,
+) -> Result<()> {
+    let line_style = ShapeStyle {
+        color,
+        filled: false,
+        stroke_width: 2,
+    };
+
+    match line_dash {
+        LineDash::Solid => {
+            legend_area
+                .draw(&PathElement::new(vec![(start_x, y), (end_x, y)], line_style))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        }
+        LineDash::Dash => {
+            // Draw dashed line sample
+            let segment_len = 4;
+            let gap_len = 3;
+            let mut x = start_x;
+            while x < end_x {
+                let segment_end = (x + segment_len).min(end_x);
+                legend_area
+                    .draw(&PathElement::new(vec![(x, y), (segment_end, y)], line_style))
+                    .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                x = segment_end + gap_len;
+            }
+        }
+        LineDash::Dot => {
+            // Draw dotted line sample
+            let dot_spacing = 3;
+            let mut x = start_x;
+            while x <= end_x {
+                legend_area
+                    .draw(&Circle::new((x, y), 1, color.filled()))
+                    .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                x += dot_spacing;
+            }
+        }
+        LineDash::DashDot => {
+            // Draw dash-dot pattern sample
+            let dash_len = 6;
+            let dot_gap = 2;
+            let mut x = start_x;
+            let mut is_dash = true;
+            while x < end_x {
+                if is_dash {
+                    let segment_end = (x + dash_len).min(end_x);
+                    legend_area
+                        .draw(&PathElement::new(vec![(x, y), (segment_end, y)], line_style))
+                        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                    x = segment_end + dot_gap;
+                } else {
+                    legend_area
+                        .draw(&Circle::new((x, y), 1, color.filled()))
+                        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                    x += 1 + dot_gap;
+                }
+                is_dash = !is_dash;
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+/// Draw a marker in the legend with the specified shape
+fn draw_legend_marker<DB: DrawingBackend>(
+    legend_area: &DrawingArea<DB, Shift>,
+    x: i32,
+    y: i32,
+    size: i32,
+    color: RGBAColor,
+    marker_shape: MarkerShape,
+) -> Result<()> {
+    match marker_shape {
+        MarkerShape::Circle => {
+            legend_area
+                .draw(&Circle::new((x, y), size, color.filled()))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        }
+        MarkerShape::Square => {
+            legend_area
+                .draw(&Rectangle::new([(x - size, y - size), (x + size, y + size)], color.filled()))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        }
+        MarkerShape::Triangle => {
+            legend_area
+                .draw(&Polygon::new(
+                    vec![(x, y - size), (x - size, y + size), (x + size, y + size)],
+                    color.filled(),
+                ))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        }
+        MarkerShape::Diamond => {
+            legend_area
+                .draw(&Polygon::new(
+                    vec![(x, y - size), (x - size, y), (x, y + size), (x + size, y)],
+                    color.filled(),
+                ))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        }
+        MarkerShape::Cross => {
+            let line_style = ShapeStyle {
+                color,
+                filled: false,
+                stroke_width: 2,
+            };
+            legend_area
+                .draw(&PathElement::new(vec![(x - size, y), (x + size, y)], line_style))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+            legend_area
+                .draw(&PathElement::new(vec![(x, y - size), (x, y + size)], line_style))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        }
+        MarkerShape::X => {
+            let line_style = ShapeStyle {
+                color,
+                filled: false,
+                stroke_width: 2,
+            };
+            legend_area
+                .draw(&PathElement::new(vec![(x - size, y - size), (x + size, y + size)], line_style))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+            legend_area
+                .draw(&PathElement::new(vec![(x - size, y + size), (x + size, y - size)], line_style))
+                .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+        }
+    }
+    
     Ok(())
 }
