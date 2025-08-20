@@ -607,85 +607,66 @@ where
 
                 match kind {
                     PlotKind::Line => {
-                        if let Some(dash) = line_dash {
-                            if use_symbols {
-                                // For symbols mode, implement basic dashed line patterns
-                                match dash {
+                        // Draw line with appropriate dash pattern
+                        let line_style = ShapeStyle {
+                            color,
+                            filled: false,
+                            stroke_width: 2,
+                        };
+
+                        if use_symbols {
+                            match line_dash.unwrap_or(crate::viz_style::LineDash::Solid) {
                                 crate::viz_style::LineDash::Solid => {
-                                    let style = ShapeStyle {
-                                        color,
-                                        filled: false,
-                                        stroke_width: 2,
-                                    };
                                     chart
-                                        .draw_series(LineSeries::new(series_f.clone(), style))
+                                        .draw_series(LineSeries::new(series_f.clone(), line_style))
                                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                 }
                                 crate::viz_style::LineDash::Dash => {
-                                    // Draw segmented line for dash effect
-                                    let style = ShapeStyle {
-                                        color,
-                                        filled: false,
-                                        stroke_width: 2,
-                                    };
-                                    // Draw segments with gaps
-                                    for chunk in series_f.chunks(2) {
+                                    // Draw dashed line with better spacing
+                                    for chunk in series_f.chunks(3) {
                                         if chunk.len() >= 2 {
                                             chart
-                                                .draw_series(LineSeries::new(chunk.iter().cloned(), style))
+                                                .draw_series(LineSeries::new(chunk.iter().take(2).cloned(), line_style))
                                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                         }
                                     }
                                 }
                                 crate::viz_style::LineDash::Dot => {
-                                    // Draw individual points for dot effect
-                                    chart
-                                        .draw_series(
-                                            series_f
-                                                .iter()
-                                                .map(|(x, y)| Circle::new((*x, *y), 1, color.clone().filled())),
-                                        )
-                                        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                                    // Draw dotted line
+                                    for (x, y) in &series_f {
+                                        chart
+                                            .draw_series(std::iter::once(Circle::new((*x, *y), 1, color.clone().filled())))
+                                            .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                                    }
                                 }
                                 crate::viz_style::LineDash::DashDot => {
-                                    // Alternate between longer and shorter segments
-                                    let style = ShapeStyle {
-                                        color,
-                                        filled: false,
-                                        stroke_width: 2,
-                                    };
-                                    for (i, chunk) in series_f.chunks(3).enumerate() {
+                                    // Draw dash-dot pattern 
+                                    for (i, chunk) in series_f.chunks(4).enumerate() {
                                         if chunk.len() >= 2 {
                                             if i % 2 == 0 {
-                                                // Dash segment
+                                                // Dash: draw line segment
                                                 chart
-                                                    .draw_series(LineSeries::new(chunk.iter().cloned(), style))
+                                                    .draw_series(LineSeries::new(chunk.iter().take(2).cloned(), line_style))
                                                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                             } else {
-                                                // Dot segment
-                                                chart
-                                                    .draw_series(
-                                                        chunk.iter().take(1)
-                                                            .map(|(x, y)| Circle::new((*x, *y), 1, color.clone().filled())),
-                                                    )
-                                                    .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                                                // Dot: draw single point
+                                                if let Some((x, y)) = chunk.first() {
+                                                    chart
+                                                        .draw_series(std::iter::once(Circle::new((*x, *y), 1, color.clone().filled())))
+                                                        .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+                                                }
                                             }
                                         }
                                     }
                                 }
-                                }
                             }
                         } else {
                             // Default solid line
-                            let style = ShapeStyle {
-                                color,
-                                filled: false,
-                                stroke_width: 2,
-                            };
                             chart
-                                .draw_series(LineSeries::new(series_f.clone(), style))
+                                .draw_series(LineSeries::new(series_f.clone(), line_style))
                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         }
+
                         if inside_mode {
                             let _legend_color = color;
                             let _legend_text = legend_label.clone();
@@ -697,29 +678,15 @@ where
                         }
                     }
                     PlotKind::Scatter => {
-                        // For symbols mode, we could vary the marker size or use different simple shapes
-                        let marker_size = if use_symbols {
-                            // Use different sizes based on marker shape
-                            match marker_shape {
-                                Some(crate::viz_style::MarkerShape::Circle) => 3,
-                                Some(crate::viz_style::MarkerShape::Square) => 4,
-                                Some(crate::viz_style::MarkerShape::Triangle) => 4,
-                                Some(crate::viz_style::MarkerShape::Diamond) => 4,
-                                Some(crate::viz_style::MarkerShape::Cross) => 5,
-                                Some(crate::viz_style::MarkerShape::X) => 5,
-                                None => 3,
-                            }
-                        } else {
-                            3
-                        };
-                        
-                        let _elem = chart
+                        // Draw markers - for now use circles until marker shapes are fully implemented
+                        chart
                             .draw_series(
                                 series_f
                                     .iter()
-                                    .map(|(x, y)| Circle::new((*x, *y), marker_size, color.clone().filled())),
+                                    .map(|(x, y)| Circle::new((*x, *y), 3, color.clone().filled())),
                             )
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
                         if inside_mode {
                             let _legend_color = color;
                             let _legend_text = legend_label.clone();
@@ -731,85 +698,60 @@ where
                         }
                     }
                     PlotKind::LinePoints => {
-                        // Draw line with appropriate style
-                        if let Some(dash) = line_dash {
-                            if use_symbols {
-                                // Use the same logic as Line plot for dash patterns
-                                match dash {
+                        // Draw line first (same as Line logic)
+                        let line_style = ShapeStyle {
+                            color,
+                            filled: false,
+                            stroke_width: 2,
+                        };
+
+                        if use_symbols {
+                            match line_dash.unwrap_or(crate::viz_style::LineDash::Solid) {
                                 crate::viz_style::LineDash::Solid => {
-                                    let style = ShapeStyle {
-                                        color,
-                                        filled: false,
-                                        stroke_width: 2,
-                                    };
                                     chart
-                                        .draw_series(LineSeries::new(series_f.clone(), style))
+                                        .draw_series(LineSeries::new(series_f.clone(), line_style))
                                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                 }
                                 crate::viz_style::LineDash::Dash => {
-                                    let style = ShapeStyle {
-                                        color,
-                                        filled: false,
-                                        stroke_width: 2,
-                                    };
-                                    for chunk in series_f.chunks(2) {
+                                    for chunk in series_f.chunks(3) {
                                         if chunk.len() >= 2 {
                                             chart
-                                                .draw_series(LineSeries::new(chunk.iter().cloned(), style))
+                                                .draw_series(LineSeries::new(chunk.iter().take(2).cloned(), line_style))
                                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                         }
                                     }
                                 }
                                 _ => {
-                                    // For dot and dash-dot, just draw solid line since points will show the pattern
-                                    let style = ShapeStyle {
+                                    // For dot and dash-dot, use thinner line since markers will be prominent
+                                    let thin_style = ShapeStyle {
                                         color,
                                         filled: false,
                                         stroke_width: 1,
                                     };
                                     chart
-                                        .draw_series(LineSeries::new(series_f.clone(), style))
+                                        .draw_series(LineSeries::new(series_f.clone(), thin_style))
                                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
-                                }
                                 }
                             }
                         } else {
-                            let style = ShapeStyle {
-                                color,
-                                filled: false,
-                                stroke_width: 2,
-                            };
                             chart
-                                .draw_series(LineSeries::new(series_f.clone(), style))
+                                .draw_series(LineSeries::new(series_f.clone(), line_style))
                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         }
                         
-                        // Draw markers with appropriate shape
-                        let marker_size = if use_symbols {
-                            match marker_shape {
-                                Some(crate::viz_style::MarkerShape::Circle) => 3,
-                                Some(crate::viz_style::MarkerShape::Square) => 4,
-                                Some(crate::viz_style::MarkerShape::Triangle) => 4,
-                                Some(crate::viz_style::MarkerShape::Diamond) => 4,
-                                Some(crate::viz_style::MarkerShape::Cross) => 5,
-                                Some(crate::viz_style::MarkerShape::X) => 5,
-                                None => 3,
-                            }
-                        } else {
-                            3
-                        };
-                        
+                        // Draw markers - for now use circles until marker shapes are fully implemented
                         chart
                             .draw_series(
                                 series_f
                                     .iter()
-                                    .map(|(x, y)| Circle::new((*x, *y), marker_size, color.clone().filled())),
+                                    .map(|(x, y)| Circle::new((*x, *y), 3, color.clone().filled())),
                             )
                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
+
                         if inside_mode {
                             let _legend_color = color;
                             let _legend_text = legend_label.clone();
-                            // TODO: Update inside legend
+                            // TODO: Update inside legend to show both line dash and marker shape
                         } else if use_symbols {
                             legend_items_with_styles.push((legend_label, color, marker_shape, line_dash));
                         } else {

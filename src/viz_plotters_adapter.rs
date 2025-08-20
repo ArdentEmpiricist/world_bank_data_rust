@@ -29,7 +29,7 @@
 use plotters::element::DynElement;
 use plotters::prelude::*;
 
-use crate::viz_style::{MarkerShape, SeriesStyle};
+use crate::viz_style::{LineDash, MarkerShape, SeriesStyle};
 
 pub fn rgb_color(style: &SeriesStyle) -> RGBColor {
     RGBColor(style.rgb.r, style.rgb.g, style.rgb.b)
@@ -39,6 +39,19 @@ pub fn rgb_color(style: &SeriesStyle) -> RGBColor {
 /// Plotters’ dashed strokes are backend-dependent; combine lines with markers for redundancy.
 pub fn line_style(style: &SeriesStyle) -> ShapeStyle {
     rgb_color(style).stroke_width(style.line_width)
+}
+
+/// Get the dash pattern for a given line dash style.
+/// Returns None for solid lines, Some(pattern) for dashed lines.
+/// Lengths are scaled by line width as specified in the requirements.
+pub fn dash_pattern(dash: LineDash, line_width: u32) -> Option<Vec<i32>> {
+    let lw = line_width as i32;
+    match dash {
+        LineDash::Solid => None,
+        LineDash::Dash => Some(vec![6 * lw, 4 * lw]), // on ≈ 6×line_width px, off ≈ 4×line_width px
+        LineDash::Dot => Some(vec![2 * lw, 4 * lw]),  // on ≈ 2×line_width px, off ≈ 4×line_width px  
+        LineDash::DashDot => Some(vec![6 * lw, 3 * lw, 2 * lw, 3 * lw]), // on ≈ 6×line_width px, off ≈ 3×line_width px, on ≈ 2×line_width px, off ≈ 3×line_width px
+    }
 }
 
 /// Build a filled style for bars (or simple filled shapes).
