@@ -153,7 +153,10 @@ This feature ensures that:
 
 - All series from the same country use the same base color hue
 - Different indicators within a country are differentiated by brightness variations
+<<<<<<< Updated upstream
 - Marker shapes and line dash patterns provide additional visual distinction
+=======
+>>>>>>> Stashed changes
 - The styling is deterministic and consistent across runs
 
 The `--country-styles` option is available at runtime and does not require any special build flags.
