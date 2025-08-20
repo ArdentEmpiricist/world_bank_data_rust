@@ -124,7 +124,9 @@ mod tests {
         // The legend should contain visual style elements for symbols mode
         // Check for presence of path elements (lines) and shape elements (markers)
         assert!(
-            svg_content.contains("<path") || svg_content.contains("<circle") || svg_content.contains("<polygon"),
+            svg_content.contains("<path")
+                || svg_content.contains("<circle")
+                || svg_content.contains("<polygon"),
             "Should contain visual elements indicating proper legend rendering with shapes"
         );
     }

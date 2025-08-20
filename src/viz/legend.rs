@@ -413,10 +413,10 @@ pub fn draw_enhanced_legend_panel<DB: DrawingBackend>(
     let line_h: i32 = font_px as i32 + 2;
     let row_gap: i32 = 4;
     let pad_small: i32 = 6;
-    let pad_band: i32 = 8;
+    let _pad_band: i32 = 8;
     let marker_radius: i32 = 4;
     let marker_to_text_gap: i32 = 12;
-    let trailing_gap: i32 = 12;
+    let _trailing_gap: i32 = 12;
     let line_sample_width: i32 = 16; // Width of line sample in legend
 
     // Styles
@@ -456,14 +456,14 @@ pub fn draw_enhanced_legend_panel<DB: DrawingBackend>(
                 let line_start_x = glyph_start_x;
                 let line_end_x = glyph_start_x + line_sample_width;
                 let line_y = block_center_y;
-                
+
                 draw_legend_line_sample(
-                    legend_area, 
-                    line_start_x, 
-                    line_end_x, 
-                    line_y, 
-                    *color, 
-                    line_dash.unwrap_or(LineDash::Solid)
+                    legend_area,
+                    line_start_x,
+                    line_end_x,
+                    line_y,
+                    *color,
+                    line_dash.unwrap_or(LineDash::Solid),
                 )?;
 
                 // Draw marker shape at center of line
@@ -474,7 +474,7 @@ pub fn draw_enhanced_legend_panel<DB: DrawingBackend>(
                     line_y,
                     marker_radius,
                     *color,
-                    marker_shape.unwrap_or(MarkerShape::Circle)
+                    marker_shape.unwrap_or(MarkerShape::Circle),
                 )?;
 
                 for (i, line) in lines.iter().enumerate() {
@@ -499,8 +499,14 @@ pub fn draw_enhanced_legend_panel<DB: DrawingBackend>(
                 .iter()
                 .map(|(label, color, _, _)| (label.clone(), *color))
                 .collect();
-            
-            return draw_legend_panel(legend_area, &simple_items, title, placement, axis_x_start_px);
+
+            return draw_legend_panel(
+                legend_area,
+                &simple_items,
+                title,
+                placement,
+                axis_x_start_px,
+            );
         }
 
         LegendMode::Inside => {
@@ -515,7 +521,7 @@ pub fn draw_enhanced_legend_panel<DB: DrawingBackend>(
 fn draw_legend_line_sample<DB: DrawingBackend>(
     legend_area: &DrawingArea<DB, Shift>,
     start_x: i32,
-    end_x: i32, 
+    end_x: i32,
     y: i32,
     color: RGBAColor,
     line_dash: LineDash,
@@ -529,7 +535,10 @@ fn draw_legend_line_sample<DB: DrawingBackend>(
     match line_dash {
         LineDash::Solid => {
             legend_area
-                .draw(&PathElement::new(vec![(start_x, y), (end_x, y)], line_style))
+                .draw(&PathElement::new(
+                    vec![(start_x, y), (end_x, y)],
+                    line_style,
+                ))
                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
         }
         LineDash::Dash => {
@@ -540,7 +549,10 @@ fn draw_legend_line_sample<DB: DrawingBackend>(
             while x < end_x {
                 let segment_end = (x + segment_len).min(end_x);
                 legend_area
-                    .draw(&PathElement::new(vec![(x, y), (segment_end, y)], line_style))
+                    .draw(&PathElement::new(
+                        vec![(x, y), (segment_end, y)],
+                        line_style,
+                    ))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 x = segment_end + gap_len;
             }
@@ -566,7 +578,10 @@ fn draw_legend_line_sample<DB: DrawingBackend>(
                 if is_dash {
                     let segment_end = (x + dash_len).min(end_x);
                     legend_area
-                        .draw(&PathElement::new(vec![(x, y), (segment_end, y)], line_style))
+                        .draw(&PathElement::new(
+                            vec![(x, y), (segment_end, y)],
+                            line_style,
+                        ))
                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                     x = segment_end + dot_gap;
                 } else {
@@ -579,7 +594,7 @@ fn draw_legend_line_sample<DB: DrawingBackend>(
             }
         }
     }
-    
+
     Ok(())
 }
 
@@ -600,7 +615,10 @@ fn draw_legend_marker<DB: DrawingBackend>(
         }
         MarkerShape::Square => {
             legend_area
-                .draw(&Rectangle::new([(x - size, y - size), (x + size, y + size)], color.filled()))
+                .draw(&Rectangle::new(
+                    [(x - size, y - size), (x + size, y + size)],
+                    color.filled(),
+                ))
                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
         }
         MarkerShape::Triangle => {
@@ -626,10 +644,16 @@ fn draw_legend_marker<DB: DrawingBackend>(
                 stroke_width: 2,
             };
             legend_area
-                .draw(&PathElement::new(vec![(x - size, y), (x + size, y)], line_style))
+                .draw(&PathElement::new(
+                    vec![(x - size, y), (x + size, y)],
+                    line_style,
+                ))
                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
             legend_area
-                .draw(&PathElement::new(vec![(x, y - size), (x, y + size)], line_style))
+                .draw(&PathElement::new(
+                    vec![(x, y - size), (x, y + size)],
+                    line_style,
+                ))
                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
         }
         MarkerShape::X => {
@@ -639,13 +663,19 @@ fn draw_legend_marker<DB: DrawingBackend>(
                 stroke_width: 2,
             };
             legend_area
-                .draw(&PathElement::new(vec![(x - size, y - size), (x + size, y + size)], line_style))
+                .draw(&PathElement::new(
+                    vec![(x - size, y - size), (x + size, y + size)],
+                    line_style,
+                ))
                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
             legend_area
-                .draw(&PathElement::new(vec![(x - size, y + size), (x + size, y - size)], line_style))
+                .draw(&PathElement::new(
+                    vec![(x - size, y + size), (x + size, y - size)],
+                    line_style,
+                ))
                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
         }
     }
-    
+
     Ok(())
 }
