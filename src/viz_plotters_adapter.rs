@@ -49,10 +49,13 @@ pub fn dash_pattern(dash: LineDash, line_width: u32) -> Option<Vec<i32>> {
     match dash {
         LineDash::Solid => None,
         LineDash::Dash => Some(vec![6 * lw, 4 * lw]), // on ≈ 6×line_width px, off ≈ 4×line_width px
-        LineDash::Dot => Some(vec![2 * lw, 4 * lw]),  // on ≈ 2×line_width px, off ≈ 4×line_width px  
+        LineDash::Dot => Some(vec![2 * lw, 4 * lw]),  // on ≈ 2×line_width px, off ≈ 4×line_width px
         LineDash::DashDot => Some(vec![6 * lw, 3 * lw, 2 * lw, 3 * lw]), // on ≈ 6×line_width px, off ≈ 3×line_width px, on ≈ 2×line_width px, off ≈ 3×line_width px
     }
 }
+
+/// Type alias to simplify complex marker element type
+type MarkerElement<'a> = Box<dyn Fn() -> Circle<(f64, f64), i32> + 'a>;
 
 /// Create an iterator of marker elements for the given points and marker shape.
 /// This provides a simple way to render different marker shapes.
@@ -61,7 +64,7 @@ pub fn create_marker_elements(
     size: i32,
     color: RGBAColor,
     marker: MarkerShape,
-) -> Vec<Box<dyn Fn() -> Circle<(f64, f64), i32> + '_>> {
+) -> Vec<MarkerElement<'_>> {
     // For now, simplify to just use circles but with different sizes per marker type
     // This is a stepping stone toward full marker shape support
     let marker_size = match marker {
@@ -72,11 +75,14 @@ pub fn create_marker_elements(
         MarkerShape::Cross => size + 2,
         MarkerShape::X => size + 2,
     };
-    
-    points.iter().map(move |(x, y)| {
-        Box::new(move || Circle::new((*x, *y), marker_size, color.filled()))
-            as Box<dyn Fn() -> Circle<(f64, f64), i32>>
-    }).collect()
+
+    points
+        .iter()
+        .map(move |(x, y)| {
+            Box::new(move || Circle::new((*x, *y), marker_size, color.filled()))
+                as Box<dyn Fn() -> Circle<(f64, f64), i32>>
+        })
+        .collect()
 }
 
 /// Build a filled style for bars (or simple filled shapes).

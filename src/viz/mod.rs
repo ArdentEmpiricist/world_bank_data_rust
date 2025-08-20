@@ -36,7 +36,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::Once;
 
-use legend::{draw_legend_panel, draw_enhanced_legend_panel, estimate_top_bottom_legend_height_px};
+use legend::{draw_enhanced_legend_panel, draw_legend_panel, estimate_top_bottom_legend_height_px};
 use util::{
     choose_axis_scale, compute_left_label_area_px, derive_axis_unit, is_percentage_like,
     map_locale, office_color,
@@ -501,7 +501,12 @@ where
     // ----------------------------
     // For symbols mode, we need to track marker shapes and line dashes in addition to colors
     let mut legend_items: Vec<(String, RGBAColor)> = Vec::new();
-    let mut legend_items_with_styles: Vec<(String, RGBAColor, Option<crate::viz_style::MarkerShape>, Option<crate::viz_style::LineDash>)> = Vec::new();
+    let mut legend_items_with_styles: Vec<(
+        String,
+        RGBAColor,
+        Option<crate::viz_style::MarkerShape>,
+        Option<crate::viz_style::LineDash>,
+    )> = Vec::new();
     let inside_mode = matches!(legend, LegendMode::Inside);
 
     // Create flags for easier handling
@@ -520,10 +525,17 @@ where
     };
 
     // Helper function to get the appropriate styling for a series
-    let get_series_style = |idx: usize, iso3: &str, indicator_id: &str| -> (RGBAColor, Option<crate::viz_style::MarkerShape>, Option<crate::viz_style::LineDash>) {
+    let get_series_style = |idx: usize,
+                            iso3: &str,
+                            indicator_id: &str|
+     -> (
+        RGBAColor,
+        Option<crate::viz_style::MarkerShape>,
+        Option<crate::viz_style::LineDash>,
+    ) {
         let mut marker_shape = None;
         let mut line_dash = None;
-        
+
         // Use country-consistent styling if enabled
         if use_country_styles
             && let Some(country_index) = country_list.iter().position(|c| c == iso3)
@@ -566,7 +578,7 @@ where
                     4 => crate::viz_style::MarkerShape::Cross,
                     _ => crate::viz_style::MarkerShape::X,
                 });
-                
+
                 line_dash = Some(match ((indicator_hash >> 8) % 4) as u8 {
                     0 => crate::viz_style::LineDash::Solid,
                     1 => crate::viz_style::LineDash::Dash,
@@ -575,7 +587,11 @@ where
                 });
             }
 
-            return (RGBAColor(adjusted_r, adjusted_g, adjusted_b, 1.0), marker_shape, line_dash);
+            return (
+                RGBAColor(adjusted_r, adjusted_g, adjusted_b, 1.0),
+                marker_shape,
+                line_dash,
+            );
         }
 
         // Default fallback: use index-based coloring
@@ -626,7 +642,10 @@ where
                                     for chunk in series_f.chunks(3) {
                                         if chunk.len() >= 2 {
                                             chart
-                                                .draw_series(LineSeries::new(chunk.iter().take(2).cloned(), line_style))
+                                                .draw_series(LineSeries::new(
+                                                    chunk.iter().take(2).cloned(),
+                                                    line_style,
+                                                ))
                                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                         }
                                     }
@@ -635,24 +654,35 @@ where
                                     // Draw dotted line
                                     for (x, y) in &series_f {
                                         chart
-                                            .draw_series(std::iter::once(Circle::new((*x, *y), 1, color.clone().filled())))
+                                            .draw_series(std::iter::once(Circle::new(
+                                                (*x, *y),
+                                                1,
+                                                color.clone().filled(),
+                                            )))
                                             .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                     }
                                 }
                                 crate::viz_style::LineDash::DashDot => {
-                                    // Draw dash-dot pattern 
+                                    // Draw dash-dot pattern
                                     for (i, chunk) in series_f.chunks(4).enumerate() {
                                         if chunk.len() >= 2 {
                                             if i % 2 == 0 {
                                                 // Dash: draw line segment
                                                 chart
-                                                    .draw_series(LineSeries::new(chunk.iter().take(2).cloned(), line_style))
+                                                    .draw_series(LineSeries::new(
+                                                        chunk.iter().take(2).cloned(),
+                                                        line_style,
+                                                    ))
                                                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                             } else {
                                                 // Dot: draw single point
                                                 if let Some((x, y)) = chunk.first() {
                                                     chart
-                                                        .draw_series(std::iter::once(Circle::new((*x, *y), 1, color.clone().filled())))
+                                                        .draw_series(std::iter::once(Circle::new(
+                                                            (*x, *y),
+                                                            1,
+                                                            color.clone().filled(),
+                                                        )))
                                                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                                 }
                                             }
@@ -692,7 +722,12 @@ where
                             let _legend_text = legend_label.clone();
                             // TODO: Update inside legend to show marker shape
                         } else if use_symbols {
-                            legend_items_with_styles.push((legend_label, color, marker_shape, None));
+                            legend_items_with_styles.push((
+                                legend_label,
+                                color,
+                                marker_shape,
+                                None,
+                            ));
                         } else {
                             legend_items.push((legend_label, color));
                         }
@@ -716,7 +751,10 @@ where
                                     for chunk in series_f.chunks(3) {
                                         if chunk.len() >= 2 {
                                             chart
-                                                .draw_series(LineSeries::new(chunk.iter().take(2).cloned(), line_style))
+                                                .draw_series(LineSeries::new(
+                                                    chunk.iter().take(2).cloned(),
+                                                    line_style,
+                                                ))
                                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                                         }
                                     }
@@ -738,7 +776,7 @@ where
                                 .draw_series(LineSeries::new(series_f.clone(), line_style))
                                 .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                         }
-                        
+
                         // Draw markers - for now use circles until marker shapes are fully implemented
                         chart
                             .draw_series(
@@ -753,7 +791,12 @@ where
                             let _legend_text = legend_label.clone();
                             // TODO: Update inside legend to show both line dash and marker shape
                         } else if use_symbols {
-                            legend_items_with_styles.push((legend_label, color, marker_shape, line_dash));
+                            legend_items_with_styles.push((
+                                legend_label,
+                                color,
+                                marker_shape,
+                                line_dash,
+                            ));
                         } else {
                             legend_items.push((legend_label, color));
                         }
@@ -914,7 +957,13 @@ where
         // Best practice: no explicit "Legend" title
         if use_symbols {
             // Use enhanced legend that shows actual line styles and markers
-            draw_enhanced_legend_panel(legend_area, &legend_items_with_styles, "", legend, axis_x_start_px)?;
+            draw_enhanced_legend_panel(
+                legend_area,
+                &legend_items_with_styles,
+                "",
+                legend,
+                axis_x_start_px,
+            )?;
         } else {
             draw_legend_panel(legend_area, &legend_items, "", legend, axis_x_start_px)?;
         }
