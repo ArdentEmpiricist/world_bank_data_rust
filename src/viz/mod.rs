@@ -36,7 +36,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::Once;
 
-use legend::{draw_legend_panel, estimate_top_bottom_legend_height_px};
+use legend::{draw_legend_panel, draw_enhanced_legend_panel, estimate_top_bottom_legend_height_px};
 use util::{
     choose_axis_scale, compute_left_label_area_px, derive_axis_unit, is_percentage_like,
     map_locale, office_color,
@@ -913,25 +913,8 @@ where
     } else if let Some(ref legend_area) = legend_area_opt {
         // Best practice: no explicit "Legend" title
         if use_symbols {
-            // Convert symbols legend items to regular items for now
-            // TODO: Implement enhanced legend that shows actual line styles and markers
-            let regular_legend_items: Vec<(String, RGBAColor)> = legend_items_with_styles
-                .into_iter()
-                .map(|(label, color, marker, line_dash)| {
-                    // Add style indicators to the label for now
-                    let enhanced_label = if let (Some(m), Some(l)) = (marker, line_dash) {
-                        format!("{} [{:?}, {:?}]", label, m, l)
-                    } else if let Some(m) = marker {
-                        format!("{} [{:?}]", label, m)
-                    } else if let Some(l) = line_dash {
-                        format!("{} [{:?}]", label, l)
-                    } else {
-                        label
-                    };
-                    (enhanced_label, color)
-                })
-                .collect();
-            draw_legend_panel(legend_area, &regular_legend_items, "", legend, axis_x_start_px)?;
+            // Use enhanced legend that shows actual line styles and markers
+            draw_enhanced_legend_panel(legend_area, &legend_items_with_styles, "", legend, axis_x_start_px)?;
         } else {
             draw_legend_panel(legend_area, &legend_items, "", legend, axis_x_start_px)?;
         }

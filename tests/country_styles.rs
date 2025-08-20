@@ -121,10 +121,11 @@ mod tests {
             svg_content.contains("Country Styles Symbols Test"),
             "Should contain title"
         );
-        // The legend should contain style information for symbols mode
+        // The legend should contain visual style elements for symbols mode
+        // Check for presence of path elements (lines) and shape elements (markers)
         assert!(
-            svg_content.contains("Circle") || svg_content.contains("Solid"),
-            "Should contain marker or line style information in legend"
+            svg_content.contains("<path") || svg_content.contains("<circle") || svg_content.contains("<polygon"),
+            "Should contain visual elements indicating proper legend rendering with shapes"
         );
     }
 

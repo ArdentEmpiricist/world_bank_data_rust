@@ -54,6 +54,31 @@ pub fn dash_pattern(dash: LineDash, line_width: u32) -> Option<Vec<i32>> {
     }
 }
 
+/// Create an iterator of marker elements for the given points and marker shape.
+/// This provides a simple way to render different marker shapes.
+pub fn create_marker_elements(
+    points: &[(f64, f64)],
+    size: i32,
+    color: RGBAColor,
+    marker: MarkerShape,
+) -> Vec<Box<dyn Fn() -> Circle<(f64, f64), i32> + '_>> {
+    // For now, simplify to just use circles but with different sizes per marker type
+    // This is a stepping stone toward full marker shape support
+    let marker_size = match marker {
+        MarkerShape::Circle => size,
+        MarkerShape::Square => size + 1,
+        MarkerShape::Triangle => size + 1,
+        MarkerShape::Diamond => size + 1,
+        MarkerShape::Cross => size + 2,
+        MarkerShape::X => size + 2,
+    };
+    
+    points.iter().map(move |(x, y)| {
+        Box::new(move || Circle::new((*x, *y), marker_size, color.filled()))
+            as Box<dyn Fn() -> Circle<(f64, f64), i32>>
+    }).collect()
+}
+
 /// Build a filled style for bars (or simple filled shapes).
 pub fn fill_style(style: &SeriesStyle) -> ShapeStyle {
     rgb_color(style).filled()
