@@ -50,11 +50,12 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 ### What it can do
 
 - **Retrieve data** from the World Bank by country/countries, indicator(s), and optional date range.
+- **Multi-indicator requests** work without specifying a World Bank `source`; the client transparently fans out per indicator when `--source` is omitted, while still supporting the single-call path when `--source` is provided.
 - **Show short stats in the terminal** (grouped min / max / mean / median per (indicator, country)).
 - **Export datasets** to **CSV** or **JSON** (format inferred from `--out` extension or set via `--format`).  
   Exports are **atomic** and CSV is **spreadsheet-safe**.
 - **Export plots** as **SVG** or **PNG** (backend inferred from `--plot` file extension).
-- **Country-consistent styling** (feature-gated): when enabled, series from the same country share consistent base colors while indicators are differentiated by shades and patterns.
+- **Country-consistent styling**: when enabled via `--country-styles`, series from the same country share consistent base colors while indicators are differentiated by shades and patterns.
 
 ### Under the hood
 
@@ -133,14 +134,11 @@ Output:
   <img src="https://raw.githubusercontent.com/ArdentEmpiricist/wbi-rs/bf42ecfa7f9a4a559b886aa5bf48d397fb41233d/assets/example_plot.svg" alt="example plot" style='width: 90%; object-fit: contain'/>
 </p>
 
-### Country-Consistent Styling (Feature-Gated)
+### Country-Consistent Styling
 
-When compiled with the `country-styles` feature, you can enable country-consistent styling where all series for the same country share one base hue from the MS Office palette, while indicators within that country are differentiated by shades:
+You can enable country-consistent styling where all series for the same country share one base hue from the MS Office palette, while indicators within that country are differentiated by shades:
 
 ```bash
-# Compile with country-styles feature
-cargo build --features country-styles
-
 # Use country-consistent styling
 wbi get \
   --countries USA,DEU \
@@ -158,6 +156,8 @@ This feature ensures that:
 - Marker shapes and line dash patterns provide additional visual distinction
 - The styling is deterministic and consistent across runs
 
+The `--country-styles` option is available at runtime and does not require any special build flags.
+
 ---
 
 ## CLI usage
@@ -167,9 +167,10 @@ Subcommand `get` accepts at least:
 - `--countries` ISO2/ISO3 codes separated by `,` or `;` (e.g., `DEU,FRA` or (attention: `" "` are required using `;`) `"DEU;FRA"`)
 - `--indicators` World Bank indicator IDs (e.g., `SP.POP.TOTL`)
 - `--date` optional year or range (e.g., `2020` or `2000:2023`)
+- `--source` optional source ID (e.g., `2` for WDI). Recommended for efficiency when querying multiple indicators, but optional.
 - `--out <PATH>` optional export (CSV/JSON); **atomic**
 - `--plot <PATH>` optional chart output (SVG/PNG), using Plotters
-- `--country-styles` (requires `country-styles` feature) enable country-consistent styling for multi-indicator plots
+- `--country-styles` enable country-consistent styling for multi-indicator plots at runtime
 
 ### Format inference for `--out`
 
@@ -235,6 +236,8 @@ fn main() -> Result<()> {
     Ok(())
 }
 ```
+
+For multi-indicator requests when `source` is `None`, the client automatically handles fallback behavior by making separate requests per indicator to ensure data retrieval succeeds.
 
 The `fetch` method automatically enriches `DataPoint.unit` values when observation rows lack a unit by fetching metadata from the World Bank indicator endpoint. This ensures that visualization and analysis code has access to appropriate unit information for axis labeling and scaling decisions.
 
