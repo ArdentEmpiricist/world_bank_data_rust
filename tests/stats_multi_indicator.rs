@@ -120,10 +120,10 @@ fn test_grouped_summary_multi_indicator_multi_country() {
     for summary in &summaries {
         let group_key = format!("{}+{}", summary.key.country_iso3, summary.key.indicator_id);
         found_groups.insert(group_key);
-        
+
         // Each group should have exactly 2 data points (2020 and 2021)
         assert_eq!(summary.count, 2);
-        
+
         // All values should be valid
         assert!(summary.mean.is_some());
         assert!(summary.median.is_some());
@@ -145,9 +145,12 @@ fn test_grouped_summary_preserves_group_structure() {
 
     for summary in summaries {
         // Check that the keys are correctly structured
-        assert!(summary.key.indicator_id == "NY.GDP.MKTP.CD" || summary.key.indicator_id == "SP.POP.TOTL");
+        assert!(
+            summary.key.indicator_id == "NY.GDP.MKTP.CD"
+                || summary.key.indicator_id == "SP.POP.TOTL"
+        );
         assert!(summary.key.country_iso3 == "USA" || summary.key.country_iso3 == "DEU");
-        
+
         // Each group should have count=2, missing=0 (all test data has values)
         assert_eq!(summary.count, 2);
         assert_eq!(summary.missing, 0);

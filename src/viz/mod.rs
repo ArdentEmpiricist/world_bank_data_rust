@@ -19,9 +19,9 @@ pub use types::{DEFAULT_LEGEND_MODE, LegendMode, PlotKind};
 pub use crate::viz_style as style;
 
 // Add near existing imports:
+use crate::viz_plotters_adapter::{fill_style, line_style, rgb_color};
 use crate::viz_style;
 use crate::viz_style::{MarkerShape, SeriesStyle};
-use crate::viz_plotters_adapter::{fill_style, line_style, rgb_color};
 
 use crate::models::DataPoint;
 use anyhow::{Result, anyhow};
@@ -46,8 +46,6 @@ use util::{
     choose_axis_scale, compute_left_label_area_px, derive_axis_unit, is_percentage_like,
     map_locale, office_color,
 };
-
-
 
 /// One-time registration for a fallback "sans-serif" font when using the `ab_glyph` text path.
 /// Required because `ab_glyph` doesn't discover OS fonts.
@@ -511,6 +509,18 @@ where
     // Create a flag for easier handling
     let use_country_styles = country_styles.unwrap_or(false);
 
+    // Helper for legend labels
+    let make_label_for_legend = |country_label: &str, indicator_label: &str| -> String {
+        if use_country_styles {
+            country_label.to_string()
+        } else {
+            make_label(country_label, indicator_label)
+        }
+    };
+
+    // De-duplicate legend labels when using country styles
+    let mut seen_legend_labels: BTreeSet<String> = BTreeSet::new();
+
     match kind {
         PlotKind::Line
         | PlotKind::Scatter
@@ -520,7 +530,7 @@ where
             for (idx, (iso3, indicator_id, country_label, indicator_label, series)) in
                 series_list.iter().enumerate()
             {
-                let legend_label = make_label(country_label, indicator_label);
+                let legend_label = make_label_for_legend(country_label, indicator_label);
                 let color = office_color(idx);
 
                 // Build style (viz_style) for markers/legend; fallback to color-only defaults
@@ -530,8 +540,16 @@ where
                     SeriesStyle {
                         country: iso3.clone(),
                         indicator: indicator_id.clone(),
-                        hsl: viz_style::Hsl { h_deg: 0.0, s: 0.0, l: 0.0 },
-                        rgb: viz_style::Rgb8 { r: color.0, g: color.1, b: color.2 },
+                        hsl: viz_style::Hsl {
+                            h_deg: 0.0,
+                            s: 0.0,
+                            l: 0.0,
+                        },
+                        rgb: viz_style::Rgb8 {
+                            r: color.0,
+                            g: color.1,
+                            b: color.2,
+                        },
                         hex: String::new(),
                         marker: MarkerShape::Circle,
                         line_dash: viz_style::LineDash::Solid,
@@ -564,67 +582,90 @@ where
                         } else {
                             legend_label.clone()
                         };
-                        
-                        let elem = chart.draw_series(std::iter::once(PathElement::new(pts, line_style(&style))))?;
-                        if inside_mode {
+
+                        let elem = chart.draw_series(std::iter::once(PathElement::new(
+                            pts,
+                            line_style(&style),
+                        )))?;
+                        if inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             let text = final_label.clone();
+                            let style_clone = style.clone();
                             let color = rgb_color(&style);
                             elem.label(text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
-                                    + Circle::new((x + 8, y), 4, color.filled())
+                                    + PathElement::new(
+                                        vec![(x - 14, y), (x + 14, y)],
+                                        line_style(&style_clone),
+                                    )
+                                    + Circle::new((x, y), 4, color.filled())
                                     + Text::new(text.clone(), (x + 20, y), ("sans-serif", 14))
                             });
-                        } else {
+                        }
+                        if !inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             legend_items.push((final_label, style.clone()));
                         }
                     }
                     PlotKind::Scatter => {
-                        // Markers only
-                        chart.draw_series(
-                            series_f
-                                .iter()
-                                .map(|(x, y)| Circle::new((*x, *y), style.marker_size as i32, fill_style(&style))),
-                        )?;
-                        if inside_mode {
+                        // Markers only - use circles for now, but proper shapes in legend
+                        chart.draw_series(series_f.iter().map(|(x, y)| {
+                            Circle::new((*x, *y), style.marker_size as i32, fill_style(&style))
+                        }))?;
+
+                        if inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             let text = legend_label.clone();
                             let color = rgb_color(&style);
-                            let empty = chart.draw_series(std::iter::empty::<Circle<(f64, f64), i32>>())?;
+                            let empty =
+                                chart.draw_series(std::iter::empty::<Circle<(f64, f64), i32>>())?;
                             empty.label(text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
                                     + Circle::new((x + 8, y), 4, color.filled())
                                     + Text::new(text.clone(), (x + 20, y), ("sans-serif", 14))
                             });
-                        } else {
+                        }
+                        if !inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             legend_items.push((legend_label.clone(), style.clone()));
                         }
                     }
                     PlotKind::LinePoints => {
                         // Draw the line
                         let pts: Vec<(f64, f64)> = series_f.clone();
-                        chart.draw_series(std::iter::once(PathElement::new(pts, line_style(&style))))?;
-                        // Overlay markers
-                        chart.draw_series(
-                            series_f
-                                .iter()
-                                .map(|(x, y)| Circle::new((*x, *y), style.marker_size as i32, fill_style(&style))),
-                        )?;
-                        if inside_mode {
+                        chart.draw_series(std::iter::once(PathElement::new(
+                            pts,
+                            line_style(&style),
+                        )))?;
+                        // Overlay markers - use circles for now, but in legend show proper marker
+                        chart.draw_series(series_f.iter().map(|(x, y)| {
+                            Circle::new((*x, *y), style.marker_size as i32, fill_style(&style))
+                        }))?;
+
+                        if inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             let text = legend_label.clone();
+                            let style_clone = style.clone();
                             let color = rgb_color(&style);
-                            let empty = chart.draw_series(std::iter::empty::<Circle<(f64, f64), i32>>())?;
+                            let empty =
+                                chart.draw_series(std::iter::empty::<Circle<(f64, f64), i32>>())?;
                             empty.label(text.clone()).legend(move |(x, y)| {
                                 EmptyElement::at((x, y))
-                                    + Circle::new((x + 8, y), 4, color.filled())
+                                    + PathElement::new(
+                                        vec![(x - 14, y), (x + 14, y)],
+                                        line_style(&style_clone),
+                                    )
+                                    + Circle::new((x, y), 4, color.filled())
                                     + Text::new(text.clone(), (x + 20, y), ("sans-serif", 14))
                             });
-                        } else {
+                        }
+                        if !inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             legend_items.push((legend_label.clone(), style.clone()));
                         }
                     }
                     PlotKind::Area => {
                         let area_pts: Vec<(f64, f64)> = series_f;
-                        let elem = chart.draw_series(AreaSeries::new(area_pts, 0.0, fill_style(&style)))?;
-                        if inside_mode {
+                        let elem = chart.draw_series(AreaSeries::new(
+                            area_pts,
+                            0.0,
+                            fill_style(&style),
+                        ))?;
+                        if inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             let text = legend_label.clone();
                             let color = rgb_color(&style);
                             elem.label(text.clone()).legend(move |(x, y)| {
@@ -632,7 +673,8 @@ where
                                     + Circle::new((x + 8, y), 4, color.filled())
                                     + Text::new(text.clone(), (x + 20, y), ("sans-serif", 14))
                             });
-                        } else {
+                        }
+                        if !inside_mode && seen_legend_labels.insert(legend_label.clone()) {
                             legend_items.push((legend_label, style));
                         }
                     }
@@ -686,17 +728,28 @@ where
                     )))
                     .map_err(|e| anyhow::anyhow!("{:?}", e))?;
 
-                legend_items.push((legend_label, SeriesStyle {
-                    country: iso3.clone(),
-                    indicator: indicator_id.clone(),
-                    hsl: viz_style::Hsl { h_deg: 0.0, s: 0.0, l: 0.0 },
-                    rgb: viz_style::Rgb8 { r: color.0, g: color.1, b: color.2 },
-                    hex: String::new(),
-                    marker: MarkerShape::Circle,
-                    line_dash: viz_style::LineDash::Solid,
-                    marker_size: 6,
-                    line_width: 2,
-                }));
+                legend_items.push((
+                    legend_label,
+                    SeriesStyle {
+                        country: iso3.clone(),
+                        indicator: indicator_id.clone(),
+                        hsl: viz_style::Hsl {
+                            h_deg: 0.0,
+                            s: 0.0,
+                            l: 0.0,
+                        },
+                        rgb: viz_style::Rgb8 {
+                            r: color.0,
+                            g: color.1,
+                            b: color.2,
+                        },
+                        hex: String::new(),
+                        marker: MarkerShape::Circle,
+                        line_dash: viz_style::LineDash::Solid,
+                        marker_size: 6,
+                        line_width: 2,
+                    },
+                ));
             }
         }
         PlotKind::GroupedBar => {
@@ -722,17 +775,28 @@ where
                         .map_err(|e| anyhow::anyhow!("{:?}", e))?;
                 }
 
-                legend_items.push((legend_label, SeriesStyle {
-                    country: iso3.clone(),
-                    indicator: indicator_id.clone(),
-                    hsl: viz_style::Hsl { h_deg: 0.0, s: 0.0, l: 0.0 },
-                    rgb: viz_style::Rgb8 { r: color.0, g: color.1, b: color.2 },
-                    hex: String::new(),
-                    marker: MarkerShape::Circle,
-                    line_dash: viz_style::LineDash::Solid,
-                    marker_size: 6,
-                    line_width: 2,
-                }));
+                legend_items.push((
+                    legend_label,
+                    SeriesStyle {
+                        country: iso3.clone(),
+                        indicator: indicator_id.clone(),
+                        hsl: viz_style::Hsl {
+                            h_deg: 0.0,
+                            s: 0.0,
+                            l: 0.0,
+                        },
+                        rgb: viz_style::Rgb8 {
+                            r: color.0,
+                            g: color.1,
+                            b: color.2,
+                        },
+                        hex: String::new(),
+                        marker: MarkerShape::Circle,
+                        line_dash: viz_style::LineDash::Solid,
+                        marker_size: 6,
+                        line_width: 2,
+                    },
+                ));
             }
         }
     }

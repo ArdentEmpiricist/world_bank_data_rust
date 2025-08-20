@@ -136,7 +136,7 @@ fn empty_points_is_error() {
 fn test_dash_patterns_with_symbols() {
     // Create test data with multiple series to test dash patterns
     let mut points = sample_points();
-    
+
     // Add more series to test different dash patterns
     for (y, v) in [(2019, 1.5), (2020, 2.2), (2021, 3.2)] {
         points.push(DataPoint {
@@ -152,7 +152,7 @@ fn test_dash_patterns_with_symbols() {
             decimal: None,
         });
     }
-    
+
     for (y, v) in [(2019, 2.8), (2020, 3.1), (2021, 3.8)] {
         points.push(DataPoint {
             indicator_id: "Z".into(),

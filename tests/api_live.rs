@@ -96,7 +96,10 @@ fn fetch_multiple_indicators_without_source_multiple_countries() {
     assert!(!pts.is_empty());
 
     // All rows should be for DEU or USA and within the requested range.
-    assert!(pts.iter().all(|p| p.country_iso3 == "DEU" || p.country_iso3 == "USA"));
+    assert!(
+        pts.iter()
+            .all(|p| p.country_iso3 == "DEU" || p.country_iso3 == "USA")
+    );
     assert!(pts.iter().all(|p| p.year >= 2019 && p.year <= 2020));
 
     // Ensure both indicators are present.
