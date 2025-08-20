@@ -211,7 +211,7 @@ The crate exposes modules for API access, models, storage, statistics, and plott
 
 ```toml
 [dependencies]
-wbi-rs = "0.1" # or "{ path = "." } to your source"
+wbi-rs = "0.1.4" # or "{ path = "." } to your source"
 anyhow = "1"
 ```
 
