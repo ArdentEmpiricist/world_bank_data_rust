@@ -4,7 +4,7 @@
 mod tests {
     use tempfile::NamedTempFile;
     use wbi_rs::models::DataPoint;
-    use wbi_rs::viz::{LegendMode, PlotKind};
+    use wbi_rs::viz::{CountryStylesMode, LegendMode, PlotKind};
 
     fn create_test_data() -> Vec<DataPoint> {
         vec![
@@ -65,7 +65,7 @@ mod tests {
         let temp_file = NamedTempFile::new().unwrap();
         let path = temp_file.path().with_extension("svg");
 
-        // Test with country styles enabled
+        // Test with country styles enabled - color mode
         let result = wbi_rs::viz::plot_chart(
             &data,
             &path,
@@ -76,7 +76,7 @@ mod tests {
             "Country Styles Test",
             PlotKind::LinePoints,
             0.3,
-            Some(true), // enable country styles
+            Some(CountryStylesMode::Color), // enable country styles - color mode
         );
 
         assert!(result.is_ok(), "Country styles plot should succeed");
@@ -88,6 +88,43 @@ mod tests {
         assert!(
             svg_content.contains("Country Styles Test"),
             "Should contain title"
+        );
+    }
+
+    #[test]
+    fn test_country_styles_symbols_mode() {
+        let data = create_test_data();
+        let temp_file = NamedTempFile::new().unwrap();
+        let path = temp_file.path().with_extension("svg");
+
+        // Test with country styles enabled - symbols mode
+        let result = wbi_rs::viz::plot_chart(
+            &data,
+            &path,
+            800,
+            600,
+            "en",
+            LegendMode::Right,
+            "Country Styles Symbols Test",
+            PlotKind::LinePoints,
+            0.3,
+            Some(CountryStylesMode::Symbols), // enable country styles - symbols mode
+        );
+
+        assert!(result.is_ok(), "Country styles symbols plot should succeed");
+        assert!(path.exists(), "SVG file should be created");
+
+        // Read the SVG content to verify basic structure
+        let svg_content = std::fs::read_to_string(&path).unwrap();
+        assert!(svg_content.contains("<svg"), "Should contain SVG content");
+        assert!(
+            svg_content.contains("Country Styles Symbols Test"),
+            "Should contain title"
+        );
+        // The legend should contain style information for symbols mode
+        assert!(
+            svg_content.contains("Circle") || svg_content.contains("Solid"),
+            "Should contain marker or line style information in legend"
         );
     }
 
@@ -145,7 +182,7 @@ mod tests {
             "Deterministic Test 1",
             PlotKind::LinePoints,
             0.3,
-            Some(true),
+            Some(CountryStylesMode::Color),
         )
         .unwrap();
 
@@ -160,7 +197,7 @@ mod tests {
             "Deterministic Test 1", // same title to ensure identical output
             PlotKind::LinePoints,
             0.3,
-            Some(true),
+            Some(CountryStylesMode::Color),
         )
         .unwrap();
 

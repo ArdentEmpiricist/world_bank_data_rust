@@ -32,6 +32,15 @@ pub enum PlotKind {
     Loess,
 }
 
+/// Country styling modes for multi-series charts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CountryStylesMode {
+    /// Use only color variations for country-indicator combinations.
+    Color,
+    /// Use color variations plus different line styles and marker shapes.
+    Symbols,
+}
+
 /// Default legend placement following mainstream design guidance:
 /// - Horizontal legend **below** the chart works well for dashboards and keeps labels close
 ///   to the x-axis start.

@@ -47,6 +47,12 @@ enum PlotKindArg {
     Loess,
 }
 
+#[derive(ValueEnum, Clone, Debug)]
+enum CountryStylesArg {
+    Color,
+    Symbols,
+}
+
 #[derive(Args, Debug)]
 struct GetArgs {
     /// Country/region codes separated by comma or semicolon (e.g., DEU,USA or EUU)
@@ -96,8 +102,8 @@ struct GetArgs {
     #[arg(long = "loess-span", default_value_t = 0.3, value_parser = parse_loess_span)]
     loess_span: f64,
     /// Enable country-consistent styling
-    #[arg(long = "country-styles", default_value_t = false)]
-    country_styles: bool,
+    #[arg(long = "country-styles", value_enum)]
+    country_styles: Option<CountryStylesArg>,
 }
 
 fn parse_list(s: &str) -> Vec<String> {
@@ -250,6 +256,10 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             PlotKindArg::GroupedBar => viz::PlotKind::GroupedBar,
             PlotKindArg::Loess => viz::PlotKind::Loess,
         };
+        let country_styles_mode = args.country_styles.map(|cs| match cs {
+            CountryStylesArg::Color => viz::CountryStylesMode::Color,
+            CountryStylesArg::Symbols => viz::CountryStylesMode::Symbols,
+        });
         viz::plot_chart(
             &points,
             plot_path,
@@ -260,7 +270,7 @@ fn cmd_get(args: GetArgs) -> Result<()> {
             title,
             plot_kind,
             args.loess_span,
-            Some(args.country_styles),
+            country_styles_mode,
         )?;
         eprintln!("Wrote plot to {}", plot_path.display());
     }
