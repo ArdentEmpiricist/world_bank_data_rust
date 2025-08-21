@@ -13,7 +13,7 @@
 </p>
 
 Fetch, analyze, and visualize World Bank data from Rust.  
-This project provides both a **CLI** and a **library API** to retrieve time series from the World Bank API, export them safely (CSV/JSON), compute grouped statistics, and render charts (SVG/PNG) with Plotters.
+This project provides a **CLI**, **GUI**, and **library API** to retrieve time series from the World Bank API, export them safely (CSV/JSON), compute grouped statistics, and render charts (SVG/PNG) with Plotters.
 
 > Status: actively developed. Library API is stable enough for use; updates follow semantic versioning.
 
@@ -24,6 +24,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 - [Features](#features)
 - [Install](#install)
 - [Quick start (CLI)](#quick-start-cli)
+- [GUI Application](#gui-application)
 - [CLI usage](#cli-usage)
   - [Format inference for `--out`](#format-inference-for---out)
   - [Examples](#examples)
@@ -163,6 +164,53 @@ This feature ensures that:
 - The styling is deterministic and consistent across runs
 
 The `--country-styles` option is available at runtime and does not require any special build flags.
+
+---
+
+## GUI Application
+
+For users who prefer a graphical interface, `wbi-rs` includes a modern, cross-platform desktop application.
+
+### Installation and Usage
+
+Build and run the GUI:
+
+```bash
+cargo build --release --bin wbi-gui
+cargo run --release --bin wbi-gui
+```
+
+### Features
+
+The GUI provides an intuitive interface for:
+
+- **Data Selection**: Easy input fields for countries and indicators
+- **Date Range**: Visual controls for selecting start and end years
+- **Export Options**: Choose CSV, JSON, or both formats
+- **Chart Creation**: Generate professional PNG or SVG charts
+- **Advanced Configuration**: Access all CLI features through collapsible advanced options
+- **File Management**: Native file browser integration with home directory defaults
+- **Real-time Feedback**: Progress indicators and clear error messages
+
+### Platform Support
+
+The GUI application works on:
+- **Windows**: Native look and feel
+- **macOS**: Cocoa interface
+- **Linux**: X11 and Wayland support
+
+### Example Workflow
+
+1. Enter countries: `USA,DEU,CHN`
+2. Enter indicators: `SP.POP.TOTL,NY.GDP.MKTP.CD`
+3. Set date range: 2010 to 2020
+4. Choose export format: CSV
+5. Enable chart creation: PNG format
+6. Click "Fetch Data"
+
+The application will download the data, save it to your chosen location, and create a chart—all with a single click.
+
+For detailed documentation, see [GUI.md](docs/GUI.md).
 
 ---
 
