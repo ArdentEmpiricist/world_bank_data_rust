@@ -27,6 +27,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 - [CLI usage](#cli-usage)
   - [Format inference for `--out`](#format-inference-for---out)
   - [Examples](#examples)
+- [All CLI subcommands](#all-cli-subcommands)
 - [Library usage](#library-usage)
   - [Add to `Cargo.toml`](#add-to-cargotoml)
   - [Fetch data](#fetch-data)
@@ -200,7 +201,7 @@ wbi get --countries DEU --indicators SP.POP.TOTL --out data.csv --format json
 
 ---
 
-## All cli subcommands
+## All CLI subcommands
 
 ```text
 wbi get --countries <CODES> --indicators <CODES> [options]
@@ -221,7 +222,7 @@ Plot (image):
       --plot <PATH>           Create a chart at the given path (.svg or .png)
       --width <PX>            Width in pixels (default: 1000)
       --height <PX>           Height in pixels (default: 600)
-      --title <TEXT>          Chart title (defaults to "World Bank Indicator(s)")
+      --title <TEXT>          Chart title (defaults to indicator name(s))
       --locale <TAG>          Locale for number formatting (default: en), e.g. en, de, fr
       --legend <inside|right|top|bottom>
                               Legend placement (default: bottom)
@@ -241,7 +242,7 @@ General:
 Notes:
 
 - The plot backend is inferred from the --plot file extension: .svg (vector) or .png (bitmap).
-- For sharper PNGs, increase --width and --height (e.g., 2400x1350 for slides).
+- Use of SVGs is recommended for presentations or publications. For sharper PNGs, increase --width and --height (e.g., 2400x1350 for slides).
 - When both --format and --out are set, they must not conflict (e.g., --format json with out=data.csv will error).
 
 ---
