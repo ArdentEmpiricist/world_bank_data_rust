@@ -29,8 +29,6 @@ path = "src/bin/wbi.rs"
 [features]
 # Enable this to run tests that hit the live World Bank API. Use: cargo test --features online
 online = []
-# Enable country-consistent styling for multi-indicator plots
-country-styles = []
 
 [dependencies]
 anyhow = "1.0.99"

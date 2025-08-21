@@ -167,7 +167,6 @@ Subcommand `get` accepts at least:
 - `--countries` ISO2/ISO3 codes separated by `,` or `;` (e.g., `DEU,FRA` or (attention: `" "` are required using `;`) `"DEU;FRA"`)
 - `--indicators` World Bank indicator IDs (e.g., `SP.POP.TOTL`)
 - `--date` optional year or range (e.g., `2020` or `2000:2023`)
-- `--source` optional source ID (e.g., `2` for WDI). Recommended for efficiency when querying multiple indicators, but optional.
 - `--out <PATH>` optional export (CSV/JSON); **atomic**
 - `--plot <PATH>` optional chart output (SVG/PNG), using Plotters
 - `--country-styles` enable country-consistent styling for multi-indicator plots at runtime
