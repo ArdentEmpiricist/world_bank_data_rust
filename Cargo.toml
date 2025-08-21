@@ -58,7 +58,7 @@ chrono = { version = "0.4.41", features = ["serde"] }
 regex = "1.11.1"
 num-format = "0.4.4"
 tempfile = "3.21.0"
-percent-encoding = "2.3.1"
+percent-encoding = "2.3.2"
 ahash = "0.8.12"
 
 
