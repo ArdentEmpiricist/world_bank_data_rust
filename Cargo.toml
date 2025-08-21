@@ -26,6 +26,10 @@ path = "src/lib.rs"
 name = "wbi"
 path = "src/bin/wbi.rs"
 
+[[bin]]
+name = "wbi-gui"
+path = "src/bin/wbi-gui.rs"
+
 [features]
 # Enable this to run tests that hit the live World Bank API. Use: cargo test --features online
 online = []
@@ -62,6 +66,12 @@ num-format = "0.4.4"
 tempfile = "3.20.0"
 percent-encoding = "2.3.1"
 ahash = "0.8.12"
+# GUI dependencies
+eframe = "0.30"
+egui = "0.30"
+rfd = "0.15"
+dirs = "5.0"
+env_logger = "0.11"
 
 
 [dev-dependencies]

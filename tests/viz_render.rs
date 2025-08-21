@@ -3,9 +3,6 @@ use std::path::PathBuf;
 use wbi_rs::models::DataPoint;
 use wbi_rs::viz::{self, LegendMode, PlotKind};
 
-#[cfg(feature = "country-styles")]
-use wbi_rs::viz::types::CountryStylesMode;
-
 fn sample_points() -> Vec<DataPoint> {
     let mut out = Vec::new();
     // Series 1: DEU
@@ -180,7 +177,7 @@ fn test_dash_patterns_with_symbols() {
                 "Dash Pattern Test",
                 PlotKind::Line,
                 0.3,
-                Some(CountryStylesMode::Symbols), // Enable symbols mode to test dash patterns
+                Some(true), // Enable country styles to test dash patterns
             )
             .unwrap();
         },
