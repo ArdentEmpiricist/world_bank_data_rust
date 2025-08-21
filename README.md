@@ -162,7 +162,7 @@ Output:
 
 ## CLI usage
 
-Subcommand `get` accepts at least:
+Most used subcommands:
 
 - `--countries` ISO2/ISO3 codes separated by `,` or `;` (e.g., `DEU,FRA` or (attention: `" "` are required using `;`) `"DEU;FRA"`)
 - `--indicators` World Bank indicator IDs (e.g., `SP.POP.TOTL`)
@@ -197,6 +197,52 @@ wbi get --countries DEU --indicators SP.POP.TOTL --out dump.xyz --format csv
 # Error on conflict
 wbi get --countries DEU --indicators SP.POP.TOTL --out data.csv --format json
 ```
+
+---
+
+## All cli subcommands
+
+```text
+wbi get --countries <CODES> --indicators <CODES> [options]
+
+Required:
+  -c, --countries <CODES>     Country/region codes (comma or semicolon separated), e.g. DEU,USA or EUU
+  -i, --indicators <CODES>    Indicator codes (comma or semicolon separated), e.g. SP.POP.TOTL
+
+Date and source:
+  -d, --date <YYYY|YYYY:YYYY> Year or inclusive range, e.g. 2010 or 2010:2023
+      --source <ID>           Source id (e.g., 2 for WDI).
+
+Output (data):
+      --out <PATH>            Save results to a file
+      --format <csv|json>     Explicit output format. If omitted, inferred from --out extension
+
+Plot (image):
+      --plot <PATH>           Create a chart at the given path (.svg or .png)
+      --width <PX>            Width in pixels (default: 1000)
+      --height <PX>           Height in pixels (default: 600)
+      --title <TEXT>          Chart title (defaults to "World Bank Indicator(s)")
+      --locale <TAG>          Locale for number formatting (default: en), e.g. en, de, fr
+      --legend <inside|right|top|bottom>
+                              Legend placement (default: bottom)
+      --plot-kind <line|scatter|line-points|area|stacked-area|grouped-bar|loess>
+                              Chart type (default: line)
+      --loess-span <FLOAT>    LOESS span in (0,1]; fraction of neighbors (only for --plot-kind loess; default: 0.3)
+      --country-styles        Enable country-consistent styling (same base hue per country)
+
+Stats:
+      --stats                 Print grouped statistics to stdout
+
+General:
+  -h, --help                  Print help
+  -V, --version               Print version
+```
+
+Notes:
+
+- The plot backend is inferred from the --plot file extension: .svg (vector) or .png (bitmap).
+- For sharper PNGs, increase --width and --height (e.g., 2400x1350 for slides).
+- When both --format and --out are set, they must not conflict (e.g., --format json with out=data.csv will error).
 
 ---
 
