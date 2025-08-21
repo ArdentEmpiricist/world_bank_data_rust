@@ -1,11 +1,11 @@
 /*!
  * GUI application for wbi-rs - World Bank Indicators data fetcher and visualizer
- * 
+ *
  * A cross-platform desktop application providing an intuitive interface for:
- * - Selecting countries and indicators  
+ * - Selecting countries and indicators
  * - Configuring date ranges and export options
  * - Generating charts and exporting data
- * 
+ *
  * Platform support: Windows, macOS, Linux
  */
 
@@ -14,8 +14,8 @@ use eframe::egui;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::thread;
-use wbi_rs::{Client, DateSpec, storage, viz};
 use wbi_rs::viz::{LegendMode, PlotKind};
+use wbi_rs::{Client, DateSpec, storage, viz};
 
 fn main() -> Result<(), eframe::Error> {
     // Enable logging for better debugging
@@ -43,7 +43,7 @@ struct WbiApp {
     indicators: String,
     date_from: i32,
     date_until: i32,
-    
+
     // Export options
     export_format: ExportFormat,
     output_path: String,
@@ -51,7 +51,7 @@ struct WbiApp {
     plot_format: PlotFormat,
     plot_width: u32,
     plot_height: u32,
-    
+
     // Advanced options
     source_id: String,
     plot_title: String,
@@ -59,12 +59,12 @@ struct WbiApp {
     legend_position: LegendPosition,
     plot_kind: PlotKindOption,
     country_styles: bool,
-    
+
     // UI state
     is_loading: bool,
     status_message: String,
     error_message: String,
-    
+
     // Background operation
     operation_receiver: Option<mpsc::Receiver<OperationResult>>,
 }
@@ -120,21 +120,21 @@ impl WbiApp {
             indicators: String::new(),
             date_from: 2010,
             date_until: 2020,
-            
+
             export_format: ExportFormat::Csv,
             output_path: home_dir,
             create_plot: false,
             plot_format: PlotFormat::Png,
             plot_width: 1000,
             plot_height: 600,
-            
+
             source_id: String::new(),
             plot_title: String::new(),
             locale: "en".to_string(),
             legend_position: LegendPosition::Bottom,
             plot_kind: PlotKindOption::Line,
             country_styles: false,
-            
+
             is_loading: false,
             status_message: String::new(),
             error_message: String::new(),
@@ -146,25 +146,25 @@ impl WbiApp {
         if self.countries.trim().is_empty() {
             anyhow::bail!("Please enter at least one country code (e.g., USA, DEU, CHN)");
         }
-        
+
         if self.indicators.trim().is_empty() {
             anyhow::bail!("Please enter at least one indicator code (e.g., SP.POP.TOTL)");
         }
-        
+
         // Validate date range
         if self.date_from > self.date_until {
             anyhow::bail!("Start year cannot be later than end year");
         }
-        
+
         if self.date_from < 1960 || self.date_until > 2030 {
             anyhow::bail!("Years should be between 1960 and 2030");
         }
-        
+
         // Validate output path
         if self.output_path.trim().is_empty() {
             anyhow::bail!("Please specify an output directory");
         }
-        
+
         // Validate plot dimensions if creating plot
         if self.create_plot {
             if self.plot_width < 200 || self.plot_width > 3000 {
@@ -174,7 +174,7 @@ impl WbiApp {
                 anyhow::bail!("Plot height must be between 200 and 3000 pixels");
             }
         }
-        
+
         Ok(())
     }
 
@@ -199,15 +199,18 @@ impl WbiApp {
         let date_spec = if date_from == date_until {
             DateSpec::Year(date_from)
         } else {
-            DateSpec::Range { start: date_from, end: date_until }
+            DateSpec::Range {
+                start: date_from,
+                end: date_until,
+            }
         };
-        
+
         let source_id = if self.source_id.trim().is_empty() {
             None
         } else {
             self.source_id.parse().ok()
         };
-        
+
         let export_format = self.export_format.clone();
         let output_path = self.output_path.clone();
         let create_plot = self.create_plot;
@@ -226,43 +229,48 @@ impl WbiApp {
 
         // Spawn background thread for the operation
         thread::spawn(move || {
-            let result = perform_operation(
-                countries,
-                indicators,
-                date_spec,
-                source_id,
+            let plot_config = if create_plot {
+                Some(PlotConfig {
+                    format: plot_format,
+                    width: plot_width,
+                    height: plot_height,
+                    title: plot_title,
+                    locale,
+                    legend_position,
+                    kind: plot_kind,
+                    country_styles,
+                })
+            } else {
+                None
+            };
+
+            let config = OperationConfig {
                 export_format,
                 output_path,
-                create_plot,
-                plot_format,
-                plot_width,
-                plot_height,
-                plot_title,
-                locale,
-                legend_position,
-                plot_kind,
-                country_styles,
-            );
-            
+                plot_config,
+            };
+
+            let result = perform_operation(countries, indicators, date_spec, source_id, config);
+
             let _ = sender.send(result);
         });
     }
 
     fn check_operation_result(&mut self) {
-        if let Some(receiver) = &self.operation_receiver {
-            if let Ok(result) = receiver.try_recv() {
-                self.is_loading = false;
-                self.operation_receiver = None;
-                
-                match result {
-                    OperationResult::Success(message) => {
-                        self.status_message = message;
-                        self.error_message.clear();
-                    }
-                    OperationResult::Error(error) => {
-                        self.error_message = error;
-                        self.status_message.clear();
-                    }
+        if let Some(receiver) = &self.operation_receiver
+            && let Ok(result) = receiver.try_recv()
+        {
+            self.is_loading = false;
+            self.operation_receiver = None;
+
+            match result {
+                OperationResult::Success(message) => {
+                    self.status_message = message;
+                    self.error_message.clear();
+                }
+                OperationResult::Error(error) => {
+                    self.error_message = error;
+                    self.status_message.clear();
                 }
             }
         }
@@ -273,7 +281,7 @@ impl eframe::App for WbiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Check for completed background operations
         self.check_operation_result();
-        
+
         // Request repaint if loading (for spinner animation)
         if self.is_loading {
             ctx.request_repaint();
@@ -326,15 +334,14 @@ impl eframe::App for WbiApp {
                     ui.horizontal(|ui| {
                         ui.label("Output path:");
                         ui.text_edit_singleline(&mut self.output_path);
-                        if ui.button("Browse").clicked() {
-                            if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                                self.output_path = path.to_string_lossy().to_string();
-                            }
+                        if ui.button("Browse").clicked()
+                            && let Some(path) = rfd::FileDialog::new().pick_folder() {
+                            self.output_path = path.to_string_lossy().to_string();
                         }
                     });
 
                     ui.checkbox(&mut self.create_plot, "Create chart");
-                    
+
                     if self.create_plot {
                         ui.horizontal(|ui| {
                             ui.label("Chart format:");
@@ -450,22 +457,31 @@ fn parse_list(s: &str) -> Vec<String> {
         .collect()
 }
 
+#[derive(Debug)]
+struct OperationConfig {
+    export_format: ExportFormat,
+    output_path: String,
+    plot_config: Option<PlotConfig>,
+}
+
+#[derive(Debug)]
+struct PlotConfig {
+    format: PlotFormat,
+    width: u32,
+    height: u32,
+    title: String,
+    locale: String,
+    legend_position: LegendPosition,
+    kind: PlotKindOption,
+    country_styles: bool,
+}
+
 fn perform_operation(
     countries: Vec<String>,
     indicators: Vec<String>,
     date_spec: DateSpec,
     source_id: Option<u32>,
-    export_format: ExportFormat,
-    output_path: String,
-    create_plot: bool,
-    plot_format: PlotFormat,
-    plot_width: u32,
-    plot_height: u32,
-    plot_title: String,
-    locale: String,
-    legend_position: LegendPosition,
-    plot_kind: PlotKindOption,
-    country_styles: bool,
+    config: OperationConfig,
 ) -> OperationResult {
     // Fetch data
     let client = Client::default();
@@ -475,15 +491,18 @@ fn perform_operation(
     };
 
     if points.is_empty() {
-        return OperationResult::Error("No data returned from the API. Please check your country and indicator codes.".to_string());
+        return OperationResult::Error(
+            "No data returned from the API. Please check your country and indicator codes."
+                .to_string(),
+        );
     }
 
     let mut output_files = Vec::new();
 
     // Export data
-    let output_dir = PathBuf::from(&output_path);
-    
-    match export_format {
+    let output_dir = PathBuf::from(&config.output_path);
+
+    match config.export_format {
         ExportFormat::Csv | ExportFormat::Both => {
             let csv_path = output_dir.join("wbi_data.csv");
             if let Err(err) = storage::save_csv(&points, &csv_path) {
@@ -494,7 +513,7 @@ fn perform_operation(
         _ => {}
     }
 
-    match export_format {
+    match config.export_format {
         ExportFormat::Json | ExportFormat::Both => {
             let json_path = output_dir.join("wbi_data.json");
             if let Err(err) = storage::save_json(&points, &json_path) {
@@ -506,22 +525,22 @@ fn perform_operation(
     }
 
     // Create plot if requested
-    if create_plot {
-        let plot_extension = match plot_format {
+    if let Some(plot_config) = config.plot_config {
+        let plot_extension = match plot_config.format {
             PlotFormat::Png => "png",
             PlotFormat::Svg => "svg",
         };
         let plot_path = output_dir.join(format!("wbi_chart.{}", plot_extension));
 
         // Convert GUI enums to library types
-        let legend_mode = match legend_position {
+        let legend_mode = match plot_config.legend_position {
             LegendPosition::Bottom => LegendMode::Bottom,
             LegendPosition::Right => LegendMode::Right,
             LegendPosition::Top => LegendMode::Top,
             LegendPosition::Inside => LegendMode::Inside,
         };
 
-        let plot_kind_lib = match plot_kind {
+        let plot_kind_lib = match plot_config.kind {
             PlotKindOption::Line => PlotKind::Line,
             PlotKindOption::Scatter => PlotKind::Scatter,
             PlotKindOption::LinePoints => PlotKind::LinePoints,
@@ -531,23 +550,27 @@ fn perform_operation(
             PlotKindOption::Loess => PlotKind::Loess,
         };
 
-        let country_styles_option = if country_styles { Some(true) } else { None };
+        let country_styles_option = if plot_config.country_styles {
+            Some(true)
+        } else {
+            None
+        };
 
         if let Err(err) = viz::plot_chart(
             &points,
             plot_path.to_str().unwrap(),
-            plot_width,
-            plot_height,
-            &locale,
+            plot_config.width,
+            plot_config.height,
+            &plot_config.locale,
             legend_mode,
-            &plot_title,
+            &plot_config.title,
             plot_kind_lib,
             0.3, // loess_span
             country_styles_option,
         ) {
             return OperationResult::Error(format!("Failed to create chart: {}", err));
         }
-        
+
         output_files.push(plot_path.to_string_lossy().to_string());
     }
 
