@@ -55,7 +55,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 - **Export datasets** to **CSV** or **JSON** (format inferred from `--out` extension or set via `--format`).  
   Exports are **atomic** and CSV is **spreadsheet-safe**.
 - **Export plots** as **SVG** or **PNG** (backend inferred from `--plot` file extension).
-- **Country-consistent styling**: when enabled via `--country-styles`, series from the same country share consistent base colors while indicators are differentiated by shades and patterns.
+- **Country-consistent styling**: when enabled via `--country-styles`, series from the same country share consistent base colors while indicators are differentiated by shades.
 
 ### Under the hood
 
