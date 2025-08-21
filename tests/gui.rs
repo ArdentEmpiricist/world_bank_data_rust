@@ -157,10 +157,10 @@ fn validate_inputs(
 }
 
 fn validate_plot_dimensions(width: u32, height: u32) -> Result<(), String> {
-    if width < 200 || width > 3000 {
+    if !(200..=3000).contains(&width) {
         return Err("Plot width must be between 200 and 3000 pixels".to_string());
     }
-    if height < 200 || height > 3000 {
+    if !(200..=3000).contains(&height) {
         return Err("Plot height must be between 200 and 3000 pixels".to_string());
     }
     Ok(())
