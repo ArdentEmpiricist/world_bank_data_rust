@@ -37,9 +37,7 @@ This project provides both a **CLI** and a **library API** to retrieve time seri
 - [Data formats](#data-formats)
 - [Security & reliability](#security--reliability)
 - [Testing](#testing)
-- [CI setup (example)](#ci-setup-example)
 - [Contributing](#contributing)
-- [Changelog (recent)](#changelog-recent)
 - [License](#license)
 - [Disclaimer](#disclaimer)
 
